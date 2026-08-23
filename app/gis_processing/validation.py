@@ -36,7 +36,7 @@ def validate_global_crs(ds: ogr.DataSource) -> bool:
     wgs84_srs = osr.SpatialReference()
     wgs84_srs.ImportFromEPSG(4326)
     wgs84_srs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
-    
+
     try:
         layer = ds.GetLayer()
         if layer is None:
@@ -44,9 +44,9 @@ def validate_global_crs(ds: ogr.DataSource) -> bool:
         srs = layer.GetSpatialRef()
         if srs is None:
             return False
-        
+
         return srs.IsSame(wgs84_srs)
-        
+
     except Exception:
         return False
 
@@ -64,10 +64,14 @@ def get_all_points(geom: ogr.Geometry) -> List[Tuple[float, float]]:
 
 def validate_geometry_vertices(geom: ogr.Geometry) -> Tuple[bool, str]:
     """Validates that all geometry vertices are within valid geographic bounds."""
-    if not geom or geom.IsEmpty(): return True, ""
+    if not geom or geom.IsEmpty():
+        return True, ""
     for lon, lat in get_all_points(geom):
         if not (-180.0 <= lon <= 180.0 and -90.0 <= lat <= 90.0):
             return False, f"Invalid coordinate range: [{lon:.5f}, {lat:.5f}]"
+        # Check for excessive decimal places (6 decimal places max)
+        if lon != round(lon, 6) or lat != round(lat, 6):
+            return False, f"Excessive decimal places: [{lon}, {lat}]"
     return True, ""
 
 def check_optional_properties(feature: ogr.Feature) -> str:
