@@ -22,25 +22,24 @@ def get_area_in_hectares(geom: ogr.Geometry) -> Optional[float]:
     """Calculates geometry area in hectares using appropriate projection."""
     if not geom or geom.IsEmpty():
         return 0.0
-    
+
     centroid = geom.Centroid()
     if not centroid:
         return None
-        
+
     lon, lat = centroid.GetX(), centroid.GetY()
     if not (-180.0 <= lon <= 180.0 and -90.0 <= lat <= 90.0):
         return None
-    
+
     utm_zone = int((lon + 180) / 6) + 1
-    
+
     source_srs = osr.SpatialReference()
     source_srs.ImportFromEPSG(4326)
     source_srs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
-    
     target_srs = osr.SpatialReference()
     target_srs.SetWellKnownGeogCS("WGS84")
     target_srs.SetUTM(utm_zone, lat >= 0)
-    
+
     try:
         transform = osr.CoordinateTransformation(source_srs, target_srs)
         geom_clone = geom.Clone()
@@ -55,7 +54,7 @@ def partition_and_process_dataset(ds: ogr.DataSource, dataset_stem: str, valid_d
     """Partitions dataset features into valid, review, and candidate categories."""
     stats = {'total': 0, 'valid_large': 0, 'review': 0, 'autofixed': 0, 'candidates': 0}
     detailed_rows = []
-    
+
     in_layer = ds.GetLayer()
     in_srs = in_layer.GetSpatialRef()
     in_layer_defn = in_layer.GetLayerDefn()
@@ -84,7 +83,7 @@ def partition_and_process_dataset(ds: ogr.DataSource, dataset_stem: str, valid_d
         geom = in_feature.GetGeometryRef()
         qa_id = in_feature.GetField(validation.ID_FIELD_NAME)
         attribute_status = validation.check_optional_properties(in_feature)
-        
+
         is_valid, reason, action_taken = validate_and_fix_geometry(geom, autofix, simplify)
         if action_taken == "Auto-fixed":
             stats['autofixed'] += 1
@@ -96,7 +95,7 @@ def partition_and_process_dataset(ds: ogr.DataSource, dataset_stem: str, valid_d
             review_feature.SetGeometry(geom)
             review_feature.SetField("qa_issue", reason)
             review_layer.CreateFeature(review_feature)
-            
+
             detailed_rows.append({
                 'original_filename': dataset_stem + ".geojson",
                 'qa_assistant_id': qa_id,
@@ -115,7 +114,7 @@ def partition_and_process_dataset(ds: ogr.DataSource, dataset_stem: str, valid_d
             review_feature.SetFrom(in_feature)
             review_feature.SetField("qa_issue", reason)
             review_layer.CreateFeature(review_feature)
-            
+
             detailed_rows.append({
                 'original_filename': dataset_stem + ".geojson",
                 'qa_assistant_id': qa_id,
@@ -131,11 +130,11 @@ def partition_and_process_dataset(ds: ogr.DataSource, dataset_stem: str, valid_d
         valid_feature.SetGeometry(geom)
 
         geom_type = geom.GetGeometryType() & 0x000000ff
-        if (identify_candidates and geom_type == ogr.wkbPolygon and 
+        if (identify_candidates and geom_type == ogr.wkbPolygon and
             area_ha < validation.MIN_AREA_HA_FOR_POLYGON):
             stats['candidates'] += 1
             candidates_layer.CreateFeature(valid_feature)
-            
+
             detailed_rows.append({
                 'original_filename': dataset_stem + ".geojson",
                 'qa_assistant_id': qa_id,
@@ -147,7 +146,7 @@ def partition_and_process_dataset(ds: ogr.DataSource, dataset_stem: str, valid_d
         else:
             stats['valid_large'] += 1
             valid_layer.CreateFeature(valid_feature)
-            
+
             detailed_rows.append({
                 'original_filename': dataset_stem + ".geojson",
                 'qa_assistant_id': qa_id,
@@ -156,7 +155,7 @@ def partition_and_process_dataset(ds: ogr.DataSource, dataset_stem: str, valid_d
                 'reason_notes': "Valid",
                 'attribute_status': attribute_status
             })
-    
+
     del review_ds, candidates_ds, valid_ds
     return stats, detailed_rows
 
@@ -164,11 +163,11 @@ def validate_and_fix_geometry(geom, autofix: bool, simplify: bool) -> Tuple[bool
     """Validates and optionally fixes geometry issues."""
     if not geom or geom.IsEmpty():
         return False, "Missing or empty geometry", None
-    
+
     geom_type = geom.GetGeometryType() & 0x000000ff
     if geom_type in [ogr.wkbLineString, ogr.wkbMultiLineString]:
         return False, "Invalid geometry type (LineString)", None
-    
+
     if not geom.IsValid():
         if autofix:
             fixed_geom = geom.Buffer(0)
@@ -179,7 +178,7 @@ def validate_and_fix_geometry(geom, autofix: bool, simplify: bool) -> Tuple[bool
                 return False, "Invalid geometry (unfixable)", None
         else:
             return False, "Invalid geometry", None
-    
+
     if geom_type == ogr.wkbPolygon and geom.GetGeometryCount() > 1:
         return False, "Polygon with holes not supported", None
 
@@ -190,11 +189,11 @@ def validate_and_fix_geometry(geom, autofix: bool, simplify: bool) -> Tuple[bool
     valid_verts, reason = validation.validate_geometry_vertices(geom)
     if not valid_verts:
         return False, reason, None
-    
+
     if simplify and geom_type == ogr.wkbPolygon:
         geom = geom.SimplifyPreserveTopology(validation.SIMPLIFY_TOLERANCE)
         return True, "Valid", "Simplified"
-    
+
     return True, "Valid", None
 
 def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_convert: List[str]) -> Tuple[int, List[str]]:
@@ -203,27 +202,27 @@ def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_conve
     candidates_dir = dated_output_dir / "06_candidates_for_conversion"
     valid_dir = dated_output_dir / "04_processed_valid"
     detailed_report_path = dated_output_dir / f"detailed_report_{dated_output_dir.name}.csv"
-    
+
     converted_count = 0
     failed_ids = []
-    
+
     candidates_by_file = {}
     for qa_id in qa_ids_to_convert:
         original_stem = "_".join(qa_id.split('_')[:-1]).split('-p')[0]
         if original_stem not in candidates_by_file:
             candidates_by_file[original_stem] = []
         candidates_by_file[original_stem].append(qa_id)
-        
+
     converted_features = {}
     for original_stem, ids in candidates_by_file.items():
         candidate_filepath = candidates_dir / f"{original_stem}_candidates.geojson"
         valid_filepath = valid_dir / f"{original_stem}_valid.geojson"
-        
+
         if not candidate_filepath.exists():
             logging.error(f"Candidate file not found: {candidate_filepath}")
             failed_ids.extend(ids)
             continue
-            
+
         existing_valid_features = []
         if valid_filepath.exists():
             try:
@@ -234,13 +233,13 @@ def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_conve
                 logging.error(f"Error reading existing valid file {valid_filepath}: {e}")
                 failed_ids.extend(ids)
                 continue
-                
+
         candidates_to_remove = []
         new_point_features = []
         try:
             with open(candidate_filepath, 'r', encoding='utf-8') as f:
                 candidates_data = json.load(f)
-            
+
             for feature in candidates_data.get('features', []):
                 qa_id = feature['properties'].get(validation.ID_FIELD_NAME)
                 if qa_id in ids:
@@ -250,7 +249,7 @@ def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_conve
                         if not geom or geom.IsEmpty():
                             failed_ids.append(qa_id)
                             continue
-                            
+
                         centroid = geom.Centroid()
                         if not centroid:
                             failed_ids.append(qa_id)
@@ -260,7 +259,7 @@ def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_conve
                         feature['geometry'] = json.loads(centroid.ExportToJson())
                         if 'Area' in feature['properties']:
                             feature['properties']['Area'] = validation.MIN_AREA_HA_FOR_POLYGON
-                        
+
                         new_point_features.append(feature)
                         candidates_to_remove.append(qa_id)
                         converted_count += 1
@@ -271,7 +270,7 @@ def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_conve
             logging.error(f"Error processing candidates file {candidate_filepath}: {e}")
             failed_ids.extend(ids)
             continue
-            
+
         if new_point_features:
             converted_features[original_stem] = {
                 'existing_features': existing_valid_features,
@@ -280,7 +279,7 @@ def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_conve
                 'candidate_filepath': candidate_filepath,
                 'candidates_to_remove': candidates_to_remove
             }
-    
+
     for original_stem, data in converted_features.items():
         try:
             all_features = data['existing_features'] + data['new_features']
@@ -292,9 +291,9 @@ def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_conve
             }
             with open(data['valid_filepath'], 'w', encoding='utf-8') as f:
                 json.dump(output_geojson, f, indent=2)
-            
+
             time.sleep(0.5)
-            
+
             remaining_candidates = []
             with open(data['candidate_filepath'], 'r', encoding='utf-8') as f:
                 candidates_data = json.load(f)
@@ -302,7 +301,7 @@ def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_conve
                     qa_id = feature['properties'].get(validation.ID_FIELD_NAME)
                     if qa_id not in data['candidates_to_remove']:
                         remaining_candidates.append(feature)
-            
+
             candidates_output = {
                 "type": "FeatureCollection",
                 "name": f"{original_stem}_candidates",
@@ -311,7 +310,7 @@ def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_conve
             }
             with open(data['candidate_filepath'], 'w', encoding='utf-8') as f:
                 json.dump(candidates_output, f, indent=2)
-                
+
             time.sleep(0.5)
         except Exception as e:
             logging.error(f"Error writing converted features for {original_stem}: {e}")
@@ -320,7 +319,7 @@ def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_conve
                 if qa_id:
                     failed_ids.append(qa_id)
             converted_count -= len(data['new_features'])
-            
+
     detailed_report_data = []
     if detailed_report_path.exists():
         try:
@@ -329,13 +328,13 @@ def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_conve
                 detailed_report_data = list(reader)
         except Exception as e:
             logging.error(f"Error reading detailed report: {e}")
-            
+
     successfully_converted = [qa_id for qa_id in qa_ids_to_convert if qa_id not in failed_ids]
     for row in detailed_report_data:
         if row['qa_assistant_id'] in successfully_converted:
             row['final_status'] = 'Valid'
             row['action_taken'] = 'Converted to Point'
-            
+
     if detailed_report_data:
         try:
             with open(detailed_report_path, mode='w', newline='', encoding='utf-8') as f:
@@ -345,7 +344,7 @@ def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_conve
             time.sleep(0.5)
         except Exception as e:
             logging.error(f"Error writing detailed report: {e}")
-            
+
     return converted_count, failed_ids
 
 def consolidate_valid_features(session_output_dir: Path) -> Optional[Path]:
@@ -358,7 +357,7 @@ def consolidate_valid_features(session_output_dir: Path) -> Optional[Path]:
     valid_dir = dated_output_dir / "04_processed_valid"
     consolidated_file_path = dated_output_dir / "consolidated_valid_features.geojson"
     all_features = []
-    
+
     for file_path in valid_dir.glob("*.geojson"):
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
@@ -367,7 +366,7 @@ def consolidate_valid_features(session_output_dir: Path) -> Optional[Path]:
                 all_features.extend(features)
         except Exception:
             continue
-    
+
     if all_features:
         output_geojson = {
             "type": "FeatureCollection",
@@ -376,7 +375,7 @@ def consolidate_valid_features(session_output_dir: Path) -> Optional[Path]:
         with open(consolidated_file_path, 'w', encoding='utf-8') as f:
             json.dump(output_geojson, f, indent=2)
         return consolidated_file_path
-    
+
     return None
 
 def _find_dated_output_dir(session_output_dir: Path) -> Path:
