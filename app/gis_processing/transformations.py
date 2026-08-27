@@ -9,6 +9,15 @@ from osgeo import ogr, osr
 
 from . import validation, reports, io
 
+def round_geometry(geom: ogr.Geometry, precision: int = 6) -> ogr.Geometry:
+    """Rounds the geometry vertices to the specified precision."""
+    for i in range(geom.GetPointCount()):
+        x, y = geom.GetPoint_2D(i)
+        geom.SetPoint_2D(i, round(x, precision), round(y, precision))
+    for i in range(geom.GetGeometryCount()):
+        round_geometry(geom.GetGeometryRef(i), precision)
+    return geom
+
 def get_area_in_hectares(geom: ogr.Geometry) -> Optional[float]:
     """Calculates geometry area in hectares using appropriate projection."""
     if not geom or geom.IsEmpty():
@@ -165,7 +174,7 @@ def validate_and_fix_geometry(geom, autofix: bool, simplify: bool) -> Tuple[bool
             fixed_geom = geom.Buffer(0)
             if fixed_geom and not fixed_geom.IsEmpty() and fixed_geom.IsValid():
                 geom = fixed_geom
-                return True, "Valid", "Auto-fixed"
+                return True, "Valid", "Auto-fixed (buffer)"
             else:
                 return False, "Invalid geometry (unfixable)", None
         else:
@@ -173,7 +182,11 @@ def validate_and_fix_geometry(geom, autofix: bool, simplify: bool) -> Tuple[bool
     
     if geom_type == ogr.wkbPolygon and geom.GetGeometryCount() > 1:
         return False, "Polygon with holes not supported", None
-    
+
+    if autofix:
+        round_geometry(geom, 6)
+        return True, "Valid", "Auto-fixed (decimal places rounded)"
+
     valid_verts, reason = validation.validate_geometry_vertices(geom)
     if not valid_verts:
         return False, reason, None
@@ -242,7 +255,8 @@ def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_conve
                         if not centroid:
                             failed_ids.append(qa_id)
                             continue
-                            
+                        round_geometry(centroid, 6)
+
                         feature['geometry'] = json.loads(centroid.ExportToJson())
                         if 'Area' in feature['properties']:
                             feature['properties']['Area'] = validation.MIN_AREA_HA_FOR_POLYGON
