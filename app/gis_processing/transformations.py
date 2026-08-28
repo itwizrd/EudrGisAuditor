@@ -13,7 +13,7 @@ def round_geometry(geom: ogr.Geometry, precision: int = 6) -> ogr.Geometry:
     """Rounds the geometry vertices to the specified precision."""
     for i in range(geom.GetPointCount()):
         x, y = geom.GetPoint_2D(i)
-        geom.SetPoint_2D(i, round(x, precision), round(y, precision))
+        geom.SetPoint_2D(i, format(x, f'.{precision}f'), format(y, f'.{precision}f'))
     for i in range(geom.GetGeometryCount()):
         round_geometry(geom.GetGeometryRef(i), precision)
     return geom
