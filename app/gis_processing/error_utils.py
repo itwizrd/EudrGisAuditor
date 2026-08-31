@@ -1,6 +1,5 @@
 from pathlib import Path
 import logging
-from typing import Any
 
 class PathValidator:
     """Centralized path validation utility."""
@@ -28,7 +27,7 @@ class DataValidator:
     """Data validation and sanitization utilities."""
 
     @staticmethod
-    def create_empty_data_response() -> dict[str, Any]:
+    def create_empty_data_response() -> dict[str, object]:
         """Returns standardized empty data structure."""
         return {
             "summary_report_data": [],
@@ -38,7 +37,7 @@ class DataValidator:
         }
 
     @staticmethod
-    def validate_session_data(data: dict[str, Any]) -> dict[str, Any]:
+    def validate_session_data(data: dict[str, object]) -> dict[str, object]:
         """Validates and sanitizes session data structure."""
         if not data or not isinstance(data, dict):
             return DataValidator.create_empty_data_response()
@@ -63,7 +62,7 @@ class ErrorHandler:
     """Centralized error handling utilities."""
 
     @staticmethod
-    def handle_file_not_found(operation: str, path: str | None = None) -> dict[str, Any]:
+    def handle_file_not_found(operation: str, path: str | None = None) -> dict[str, object]:
         """Standard response for file not found errors."""
         message = f"{operation} failed - file not found"
         if path:
@@ -72,14 +71,14 @@ class ErrorHandler:
         return {"error": "File not found", "data": DataValidator.create_empty_data_response()}
 
     @staticmethod
-    def handle_processing_error(operation: str, error: Exception) -> dict[str, Any]:
+    def handle_processing_error(operation: str, error: Exception) -> dict[str, object]:
         """Standard response for processing errors."""
         message = f"{operation} failed: {str(error)}"
         logging.error(message, exc_info=True)
         return {"error": "Processing error", "data": DataValidator.create_empty_data_response()}
 
     @staticmethod
-    def log_and_return_error(operation: str, error: Exception, include_data: bool = True) -> dict[str, Any]:
+    def log_and_return_error(operation: str, error: Exception, include_data: bool = True) -> dict[str, object]:
         """Logs error and returns standardized error response."""
         logging.error(f"Error in {operation}: {error}", exc_info=True)
         response = {"error": str(error)}
