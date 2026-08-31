@@ -4,7 +4,6 @@ import shutil
 import time
 import csv
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional, Any
 from osgeo import ogr, osr
 
 from . import validation, reports, io
@@ -18,7 +17,7 @@ def round_geometry(geom: ogr.Geometry, precision: int = 6) -> ogr.Geometry:
         round_geometry(geom.GetGeometryRef(i), precision)
     return geom
 
-def get_area_in_hectares(geom: ogr.Geometry) -> Optional[float]:
+def get_area_in_hectares(geom: ogr.Geometry) -> float | None:
     """Calculates geometry area in hectares using appropriate projection."""
     if not geom or geom.IsEmpty():
         return 0.0
@@ -50,7 +49,7 @@ def get_area_in_hectares(geom: ogr.Geometry) -> Optional[float]:
 
 def partition_and_process_dataset(ds: ogr.DataSource, dataset_stem: str, valid_dir: Path,
                                 review_dir: Path, candidates_dir: Path, simplify: bool,
-                                autofix: bool, identify_candidates: bool) -> Tuple[Dict, List[Dict]]:
+                                autofix: bool, identify_candidates: bool) -> tuple[dict, list[dict]]:
     """Partitions dataset features into valid, review, and candidate categories."""
     stats = {'total': 0, 'valid_large': 0, 'review': 0, 'autofixed': 0, 'candidates': 0}
     detailed_rows = []
@@ -159,7 +158,7 @@ def partition_and_process_dataset(ds: ogr.DataSource, dataset_stem: str, valid_d
     del review_ds, candidates_ds, valid_ds
     return stats, detailed_rows
 
-def validate_and_fix_geometry(geom, autofix: bool, simplify: bool) -> Tuple[bool, str, Optional[str]]:
+def validate_and_fix_geometry(geom, autofix: bool, simplify: bool) -> tuple[bool, str, str | None]:
     """Validates and optionally fixes geometry issues."""
     if not geom or geom.IsEmpty():
         return False, "Missing or empty geometry", None
@@ -196,7 +195,7 @@ def validate_and_fix_geometry(geom, autofix: bool, simplify: bool) -> Tuple[bool
 
     return True, "Valid", None
 
-def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_convert: List[str]) -> Tuple[int, List[str]]:
+def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_convert: list[str]) -> tuple[int, list[str]]:
     """Converts candidate polygons to points in a batch operation."""
     dated_output_dir = _find_dated_output_dir(session_output_dir)
     candidates_dir = dated_output_dir / "06_candidates_for_conversion"
@@ -347,7 +346,7 @@ def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_conve
 
     return converted_count, failed_ids
 
-def consolidate_valid_features(session_output_dir: Path) -> Optional[Path]:
+def consolidate_valid_features(session_output_dir: Path) -> Path | None:
     """Consolidates all valid features into a single GeoJSON file."""
     try:
         dated_output_dir = _find_dated_output_dir(session_output_dir)
