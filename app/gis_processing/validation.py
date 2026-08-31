@@ -1,29 +1,14 @@
-from typing import Set, List, Tuple, Optional
 from osgeo import ogr, osr
-import math
+
+from . import const_iso2
 
 ID_FIELD_NAME: str = "qa_assistant_id"
 MIN_AREA_HA_FOR_POLYGON: float = 4.0
 METERS_SQ_PER_HECTARE: float = 10000.0
 SIMPLIFY_TOLERANCE: float = 0.0001
-OPTIONAL_FIELDS: List[str] = ['ProductionPlace', 'ProducerName', 'ProducerCountry', 'Area']
-DATASET_TRIGGERS: Set[str] = {".shp", ".geojson"}
-VALID_ISO2_CODES: Set[str] = {
-    'AD', 'AE', 'AF', 'AG', 'AI', 'AL', 'AM', 'AO', 'AQ', 'AR', 'AS', 'AT', 'AU', 'AW', 'AX', 'AZ', 'BA', 'BB',
-    'BD', 'BE', 'BF', 'BG', 'BH', 'BI', 'BJ', 'BL', 'BM', 'BN', 'BO', 'BQ', 'BR', 'BS', 'BT', 'BV', 'BW', 'BY',
-    'BZ', 'CA', 'CC', 'CD', 'CF', 'CG', 'CH', 'CI', 'CK', 'CL', 'CM', 'CN', 'CO', 'CR', 'CU', 'CV', 'CW', 'CX',
-    'CY', 'CZ', 'DE', 'DJ', 'DK', 'DM', 'DO', 'DZ', 'EC', 'EE', 'EG', 'EH', 'ER', 'ES', 'ET', 'FI', 'FJ', 'FK',
-    'FM', 'FO', 'FR', 'GA', 'GB', 'GD', 'GE', 'GF', 'GG', 'GH', 'GI', 'GL', 'GM', 'GN', 'GP', 'GQ', 'GR', 'GS',
-    'GT', 'GU', 'GW', 'GY', 'HK', 'HM', 'HN', 'HR', 'HT', 'HU', 'ID', 'IE', 'IL', 'IM', 'IN', 'IO', 'IQ', 'IR',
-    'IS', 'IT', 'JE', 'JM', 'JO', 'JP', 'KE', 'KG', 'KH', 'KI', 'KM', 'KN', 'KP', 'KR', 'KW', 'KY', 'KZ', 'LA',
-    'LB', 'LC', 'LI', 'LK', 'LS', 'LT', 'LU', 'LV', 'LY', 'MA', 'MC', 'MD', 'ME', 'MF', 'MG', 'MH', 'MK',
-    'ML', 'MM', 'MN', 'MO', 'MP', 'MQ', 'MR', 'MS', 'MT', 'MU', 'MV', 'MW', 'MX', 'MY', 'MZ', 'NA', 'NC', 'NE',
-    'NF', 'NG', 'NI', 'NL', 'NO', 'NP', 'NR', 'NU', 'NZ', 'OM', 'PA', 'PE', 'PF', 'PG', 'PH', 'PK', 'PL', 'PM',
-    'PN', 'PR', 'PS', 'PT', 'PW', 'PY', 'QA', 'RE', 'RO', 'RS', 'RU', 'RW', 'SA', 'SB', 'SC', 'SD', 'SE', 'SG',
-    'SH', 'SI', 'SJ', 'SK', 'SL', 'SM', 'SN', 'SO', 'SR', 'SS', 'ST', 'SV', 'SX', 'SY', 'SZ', 'TC', 'TD', 'TF',
-    'TG', 'TH', 'TJ', 'TK', 'TL', 'TM', 'TN', 'TO', 'TR', 'TT', 'TV', 'TW', 'TZ', 'UA', 'UG', 'UM', 'US', 'UY',
-    'UZ', 'VA', 'VC', 'VE', 'VG', 'VI', 'VN', 'VU', 'WF', 'WS', 'YE', 'YT', 'ZA', 'ZM', 'ZW'
-}
+OPTIONAL_FIELDS: list[str] = ['ProductionPlace', 'ProducerName', 'ProducerCountry', 'Area']
+DATASET_TRIGGERS: set[str] = {".shp", ".geojson"}
+VALID_ISO2_CODES = const_iso2.VALID_ISO2_CODES
 
 def validate_global_crs(ds: ogr.DataSource) -> bool:
     """
@@ -50,7 +35,7 @@ def validate_global_crs(ds: ogr.DataSource) -> bool:
     except Exception:
         return False
 
-def get_all_points(geom: ogr.Geometry) -> List[Tuple[float, float]]:
+def get_all_points(geom: ogr.Geometry) -> list[tuple[float, float]]:
     """Recursively extracts all vertex coordinates from a geometry object."""
     points = []
     geom_type = geom.GetGeometryType() & 0x000000ff
@@ -62,7 +47,7 @@ def get_all_points(geom: ogr.Geometry) -> List[Tuple[float, float]]:
             if sub_geom: points.extend(get_all_points(sub_geom))
     return points
 
-def validate_geometry_vertices(geom: ogr.Geometry) -> Tuple[bool, str]:
+def validate_geometry_vertices(geom: ogr.Geometry) -> tuple[bool, str]:
     """Validates that all geometry vertices are within valid geographic bounds."""
     if not geom or geom.IsEmpty():
         return True, ""
@@ -90,7 +75,7 @@ def check_optional_properties(feature: ogr.Feature) -> str:
         else: notes.append("OK")
     return "; ".join(notes)
 
-def summarize_attribute_status(all_notes: List[str]) -> str:
+def summarize_attribute_status(all_notes: list[str]) -> str:
     """Provides a high-level summary of attribute validation results."""
     if not all_notes: return "N/A"
     has_issues = any("Invalid" in note for note in all_notes)
