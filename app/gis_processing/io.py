@@ -105,7 +105,7 @@ def delete_intermediate_components(processed_path: Path, traced_dir: Path, origi
     except Exception as e:
         logging.error(f"Failed to delete intermediate or original file components for {processed_path.name}: {e}")
 
-def get_geojson_feature(session_output_dir: Path, layer_type: str, filename: str, qa_id: str) -> dict[str, str | int | float | list[tuple[float, float]] | None] | None:
+def get_geojson_feature(session_output_dir: Path, layer_type: str, filename: str, qa_id: str) -> dict[str, object] | None:
     try:
         dated_output_dir = _find_dated_output_dir(session_output_dir)
         if layer_type == 'review': base_path = dated_output_dir / "05_processed_review_features"
