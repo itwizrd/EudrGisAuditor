@@ -1,17 +1,14 @@
 import shutil
-import csv
 import json
 import logging
-import time
 from pathlib import Path
-from typing import Optional, Dict, Tuple, List
 from osgeo import ogr, osr
 
 from . import reports, validation
 
 ogr.UseExceptions()
 
-def inject_traceability_id(dataset_path: Path, output_dir: Path, id_field_name: str) -> Optional[Path]:
+def inject_traceability_id(dataset_path: Path, output_dir: Path, id_field_name: str) -> Path | None:
     """Create unique IDs for each feature in the dataset."""
     in_ds, out_ds = None, None
     try:
@@ -40,7 +37,7 @@ def inject_traceability_id(dataset_path: Path, output_dir: Path, id_field_name: 
         if in_ds: in_ds = None
         if out_ds: out_ds = None
 
-def explode_multipart_features(dataset_path: Path, output_dir: Path, id_field_name: str) -> Optional[Path]:
+def explode_multipart_features(dataset_path: Path, output_dir: Path, id_field_name: str) -> Path | None:
     """Explode multipolygon geometries into singlepart features."""
     in_ds, out_ds = None, None
     try:
@@ -76,7 +73,7 @@ def explode_multipart_features(dataset_path: Path, output_dir: Path, id_field_na
         if in_ds: in_ds = None
         if out_ds: out_ds = None
 
-def open_dataset(dataset_path: Path) -> Optional[ogr.DataSource]:
+def open_dataset(dataset_path: Path) -> ogr.DataSource | None:
     """Opens and returns an OGR dataset."""
     try:
         return ogr.Open(str(dataset_path), 0)
@@ -108,7 +105,7 @@ def delete_intermediate_components(processed_path: Path, traced_dir: Path, origi
     except Exception as e:
         logging.error(f"Failed to delete intermediate or original file components for {processed_path.name}: {e}")
 
-def get_geojson_feature(session_output_dir: Path, layer_type: str, filename: str, qa_id: str) -> Optional[Dict]:
+def get_geojson_feature(session_output_dir: Path, layer_type: str, filename: str, qa_id: str) -> dict[str, str | int | float | list[tuple[float, float]] | None] | None:
     try:
         dated_output_dir = _find_dated_output_dir(session_output_dir)
         if layer_type == 'review': base_path = dated_output_dir / "05_processed_review_features"

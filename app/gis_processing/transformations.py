@@ -1,6 +1,5 @@
 import json
 import logging
-import shutil
 import time
 import csv
 from pathlib import Path
@@ -49,7 +48,7 @@ def get_area_in_hectares(geom: ogr.Geometry) -> float | None:
 
 def partition_and_process_dataset(ds: ogr.DataSource, dataset_stem: str, valid_dir: Path,
                                 review_dir: Path, candidates_dir: Path, simplify: bool,
-                                autofix: bool, identify_candidates: bool) -> tuple[dict, list[dict]]:
+                                autofix: bool, identify_candidates: bool) -> tuple[dict[str, int], list[dict[str, str | None]]]:
     """Partitions dataset features into valid, review, and candidate categories."""
     stats = {'total': 0, 'valid_large': 0, 'review': 0, 'autofixed': 0, 'candidates': 0}
     detailed_rows = []

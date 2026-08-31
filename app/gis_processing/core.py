@@ -1,6 +1,5 @@
-import shutil
 from pathlib import Path
-from typing import Optional, Dict, Callable
+from collections.abc import Callable
 
 from . import validation, reports, transformations, io
 from .validation import ID_FIELD_NAME, DATASET_TRIGGERS
@@ -19,7 +18,7 @@ class EudrGisQaAssistant:
         self.simplify_geometries = simplify_geometries
         self.autofix_geometries = autofix_geometries
         self.identify_candidates = identify_candidates
-        
+
         self.traced_originals_dir = self.output_dir / "00_original_with_ids"
         self.exploded_dir = self.output_dir / "00a_exploded_features"
         self.unsupported_dir = self.output_dir / "01_unsupported"
@@ -27,20 +26,20 @@ class EudrGisQaAssistant:
         self.processed_valid_dir = self.output_dir / "04_processed_valid"
         self.processed_review_dir = self.output_dir / "05_processed_review_features"
         self.conversion_candidates_dir = self.output_dir / "06_candidates_for_conversion"
-        
-        for folder in [self.traced_originals_dir, self.exploded_dir, self.unsupported_dir, 
-                       self.invalid_global_dir, self.processed_valid_dir, self.processed_review_dir, 
+
+        for folder in [self.traced_originals_dir, self.exploded_dir, self.unsupported_dir,
+                       self.invalid_global_dir, self.processed_valid_dir, self.processed_review_dir,
                        self.conversion_candidates_dir]:
             folder.mkdir(parents=True, exist_ok=True)
-        
+
         self.summary_report_path = self.output_dir / f"summary_report_{self.run_date}.csv"
         self.detailed_report_path = self.output_dir / f"detailed_report_{self.run_date}.csv"
         reports.initialize_reports(self.summary_report_path, self.detailed_report_path)
 
-    def run(self, update_progress: Optional[Callable[[Dict], None]] = None):
-        datasets_to_process = [p for p in self.input_dir.iterdir() 
+    def run(self, update_progress: Callable[[dict[str, str | int | float | None]], None] | None = None):
+        datasets_to_process = [p for p in self.input_dir.iterdir()
                                if p.is_file() and p.suffix.lower() in DATASET_TRIGGERS]
-        
+
         if not datasets_to_process:
             if update_progress:
                 update_progress({'progress': 100, 'message': 'No GIS files found.', 'step': 'Completed'})
@@ -48,7 +47,7 @@ class EudrGisQaAssistant:
 
         def update_step_progress(step_key, step_progress, message, step_name):
             progress_ranges = {
-                'inject_ids': (0, 10), 'explode': (10, 20), 'validate': (20, 80), 
+                'inject_ids': (0, 10), 'explode': (10, 20), 'validate': (20, 80),
                 'reports': (80, 90), 'cleanup': (90, 95)
             }
             start, end = progress_ranges[step_key]
@@ -77,16 +76,16 @@ class EudrGisQaAssistant:
         for i, dataset_path in enumerate(exploded_files):
             step_progress = (i / len(exploded_files)) * 100
             update_step_progress('validate', step_progress, f'Validating {dataset_path.name}...', 'Step 3/5: Validating')
-            
+
             ds = io.open_dataset(dataset_path)
             if not ds:
                 continue
-            
+
             original_name = Path(dataset_path.name).name
-            
+
             if not validation.validate_global_crs(ds):
-                io.move_and_log_dataset(dataset_path, self.invalid_global_dir, 
-                                        "WRONG_EPSG", f"EPSG is not {self.EXPECTED_EPSG}", 
+                io.move_and_log_dataset(dataset_path, self.invalid_global_dir,
+                                        "WRONG_EPSG", f"EPSG is not {self.EXPECTED_EPSG}",
                                         original_name, self.summary_report_path)
                 continue
 
@@ -96,23 +95,23 @@ class EudrGisQaAssistant:
                 self.identify_candidates
             )
             all_detailed_rows.extend(detailed_rows)
-            
+
             status = "PROCESSED_WITH_ISSUES" if (partition_stats['review'] > 0 or partition_stats['candidates'] > 0) else "PROCESSED_CLEAN"
             note_parts = []
             if partition_stats['review'] > 0:
                 note_parts.append(f"{partition_stats['review']} features for review")
             if partition_stats['candidates'] > 0:
                 note_parts.append(f"{partition_stats['candidates']} small polygons found")
-            
+
             attribute_summary = validation.summarize_attribute_status([row['attribute_status'] for row in detailed_rows])
-            reports.log_to_summary_report(self.summary_report_path, original_name, "PASSED_PRECHECK", 
-                                        status, partition_stats, attribute_summary, 
+            reports.log_to_summary_report(self.summary_report_path, original_name, "PASSED_PRECHECK",
+                                        status, partition_stats, attribute_summary,
                                         " ".join(note_parts) or "All features are valid.")
-            
+
             io.delete_intermediate_components(dataset_path, self.traced_originals_dir, self.input_dir)
 
         update_step_progress('reports', 50, 'Generating reports...', 'Step 4/5: Reporting')
         reports.log_detailed_rows_to_report(self.detailed_report_path, all_detailed_rows)
         io.process_unsupported_files(self.input_dir, self.unsupported_dir, self.summary_report_path)
-        
+
         update_step_progress('cleanup', 100, 'Analysis complete', 'Step 5/5: Complete')

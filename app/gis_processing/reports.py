@@ -1,6 +1,5 @@
 import csv
 from pathlib import Path
-from typing import Dict, List, Any
 
 def initialize_reports(summary_path: Path, detailed_path: Path):
     """Initialize report CSV files with headers."""
@@ -11,7 +10,7 @@ def initialize_reports(summary_path: Path, detailed_path: Path):
             "Valid Large Polygons", "Features for Review", "Auto-fixed Features",
             "Small Polygons Found (<4ha)", "Attribute Status", "Reason / Notes"
         ])
-    
+
     with open(detailed_path, mode="w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow([
@@ -20,7 +19,7 @@ def initialize_reports(summary_path: Path, detailed_path: Path):
         ])
 
 def log_to_summary_report(summary_path: Path, name: str, initial: str, processing: str,
-                         stats: Dict[str, Any], attr_status: str, reason: str):
+                         stats: dict[str, str | int | float | None], attr_status: str, reason: str):
     """Append a row to the summary report CSV."""
     try:
         with open(summary_path, mode="a", newline="", encoding="utf-8") as f:
@@ -38,11 +37,11 @@ def log_to_summary_report(summary_path: Path, name: str, initial: str, processin
     except Exception:
         pass
 
-def log_detailed_rows_to_report(detailed_path: Path, rows: List[Dict]):
+def log_detailed_rows_to_report(detailed_path: Path, rows: list[dict[str, str | int | float | None]]):
     """Append multiple rows to the detailed report CSV."""
     if not rows:
         return
-    
+
     try:
         with open(detailed_path, mode="a", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))

@@ -1,10 +1,10 @@
 from pathlib import Path
 import logging
-from typing import Optional, Dict, Any
+from typing import Any
 
 class PathValidator:
     """Centralized path validation utility."""
-    
+
     @staticmethod
     def validate_path(base_dir: Path, path_segment: str) -> Path:
         """Safely validates and resolves a path within a base directory."""
@@ -13,7 +13,7 @@ class PathValidator:
         if not path.is_relative_to(base_dir):
             raise ValueError("Invalid path segment")
         return path
-    
+
     @staticmethod
     def ensure_directory_exists(path: Path) -> bool:
         """Ensures a directory exists, creates if necessary."""
@@ -26,9 +26,9 @@ class PathValidator:
 
 class DataValidator:
     """Data validation and sanitization utilities."""
-    
+
     @staticmethod
-    def create_empty_data_response() -> Dict[str, Any]:
+    def create_empty_data_response() -> dict[str, Any]:
         """Returns standardized empty data structure."""
         return {
             "summary_report_data": [],
@@ -36,50 +36,50 @@ class DataValidator:
             "map_layers": [],
             "clean_file_count": 0
         }
-    
+
     @staticmethod
-    def validate_session_data(data: Dict[str, Any]) -> Dict[str, Any]:
+    def validate_session_data(data: dict[str, Any]) -> dict[str, Any]:
         """Validates and sanitizes session data structure."""
         if not data or not isinstance(data, dict):
             return DataValidator.create_empty_data_response()
-        
+
         validated = DataValidator.create_empty_data_response()
-        
+
         if isinstance(data.get('summary_report_data'), list):
             validated['summary_report_data'] = data['summary_report_data']
-            
+
         if isinstance(data.get('detailed_report_data'), list):
             validated['detailed_report_data'] = data['detailed_report_data']
-            
+
         if isinstance(data.get('map_layers'), list):
             validated['map_layers'] = data['map_layers']
-            
+
         if isinstance(data.get('clean_file_count'), int):
             validated['clean_file_count'] = data['clean_file_count']
-            
+
         return validated
 
 class ErrorHandler:
     """Centralized error handling utilities."""
-    
+
     @staticmethod
-    def handle_file_not_found(operation: str, path: Optional[str] = None) -> Dict[str, Any]:
+    def handle_file_not_found(operation: str, path: str | None = None) -> dict[str, Any]:
         """Standard response for file not found errors."""
         message = f"{operation} failed - file not found"
         if path:
             message += f": {path}"
         logging.warning(message)
         return {"error": "File not found", "data": DataValidator.create_empty_data_response()}
-    
+
     @staticmethod
-    def handle_processing_error(operation: str, error: Exception) -> Dict[str, Any]:
+    def handle_processing_error(operation: str, error: Exception) -> dict[str, Any]:
         """Standard response for processing errors."""
         message = f"{operation} failed: {str(error)}"
         logging.error(message, exc_info=True)
         return {"error": "Processing error", "data": DataValidator.create_empty_data_response()}
-    
+
     @staticmethod
-    def log_and_return_error(operation: str, error: Exception, include_data: bool = True) -> Dict[str, Any]:
+    def log_and_return_error(operation: str, error: Exception, include_data: bool = True) -> dict[str, Any]:
         """Logs error and returns standardized error response."""
         logging.error(f"Error in {operation}: {error}", exc_info=True)
         response = {"error": str(error)}
