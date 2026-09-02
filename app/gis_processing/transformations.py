@@ -1,11 +1,14 @@
 import json
 import logging
+from math import log
 import time
 import csv
 from pathlib import Path
 from osgeo import ogr, osr
 
 from . import validation, reports, io
+
+logger = logging.getLogger(__name__)
 
 def round_geometry(geom: ogr.Geometry, precision: int = 6) -> ogr.Geometry:
     """Rounds the geometry vertices to the specified precision."""
@@ -44,6 +47,7 @@ def get_area_in_hectares(geom: ogr.Geometry) -> float | None:
         geom_clone.Transform(transform)
         return geom_clone.GetArea() / validation.METERS_SQ_PER_HECTARE
     except RuntimeError:
+        logger.error(f"Failed to transform geometry: {geom}")
         return None
 
 def partition_and_process_dataset(ds: ogr.DataSource, dataset_stem: str, valid_dir: Path,
@@ -228,7 +232,7 @@ def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_conve
                     valid_data = json.load(f)
                     existing_valid_features = valid_data.get('features', [])
             except Exception as e:
-                logging.error(f"Error reading existing valid file {valid_filepath}: {e}")
+                logger.error("Failed to read existing valid file %s: %s", valid_filepath, e)
                 failed_ids.extend(ids)
                 continue
 
@@ -262,10 +266,10 @@ def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_conve
                         candidates_to_remove.append(qa_id)
                         converted_count += 1
                     except Exception as e:
-                        logging.error(f"Failed to convert {qa_id}: {e}")
+                        logger.error(f"Failed to convert {qa_id}: {e}")
                         failed_ids.append(qa_id)
         except Exception as e:
-            logging.error(f"Error processing candidates file {candidate_filepath}: {e}")
+            logger.error(f"Error processing candidates file {candidate_filepath}: {e}")
             failed_ids.extend(ids)
             continue
 
@@ -311,7 +315,7 @@ def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_conve
 
             time.sleep(0.5)
         except Exception as e:
-            logging.error(f"Error writing converted features for {original_stem}: {e}")
+            logger.error(f"Error writing converted features for {original_stem}: {e}")
             for feature in data['new_features']:
                 qa_id = feature['properties'].get(validation.ID_FIELD_NAME)
                 if qa_id:
@@ -325,7 +329,7 @@ def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_conve
                 reader = csv.DictReader(f)
                 detailed_report_data = list(reader)
         except Exception as e:
-            logging.error(f"Error reading detailed report: {e}")
+            logger.error(f"Error reading detailed report: {e}")
 
     successfully_converted = [qa_id for qa_id in qa_ids_to_convert if qa_id not in failed_ids]
     for row in detailed_report_data:
@@ -341,7 +345,7 @@ def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_conve
                 writer.writerows(detailed_report_data)
             time.sleep(0.5)
         except Exception as e:
-            logging.error(f"Error writing detailed report: {e}")
+            logger.error(f"Error writing detailed report: {e}")
 
     return converted_count, failed_ids
 
@@ -363,6 +367,7 @@ def consolidate_valid_features(session_output_dir: Path) -> Path | None:
                 features = data.get('features', [])
                 all_features.extend(features)
         except Exception:
+            logger.error(f"Error reading {file_path}")
             continue
 
     if all_features:
