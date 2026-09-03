@@ -1,6 +1,9 @@
 from pathlib import Path
 import logging
 
+
+logger = logging.getLogger(__name__)
+
 class PathValidator:
     """Centralized path validation utility."""
 
@@ -19,8 +22,8 @@ class PathValidator:
         try:
             path.mkdir(parents=True, exist_ok=True)
             return True
-        except Exception as e:
-            logging.error(f"Failed to create directory {path}: {e}")
+        except OSError as e:
+            logger.error(f"Failed to create directory {path}: {e}")
             return False
 
 class DataValidator:
@@ -67,20 +70,20 @@ class ErrorHandler:
         message = f"{operation} failed - file not found"
         if path:
             message += f": {path}"
-        logging.warning(message)
+        logger.warning(message)
         return {"error": "File not found", "data": DataValidator.create_empty_data_response()}
 
     @staticmethod
     def handle_processing_error(operation: str, error: Exception) -> dict[str, object]:
         """Standard response for processing errors."""
         message = f"{operation} failed: {str(error)}"
-        logging.error(message, exc_info=True)
+        logger.error(message, exc_info=True)
         return {"error": "Processing error", "data": DataValidator.create_empty_data_response()}
 
     @staticmethod
     def log_and_return_error(operation: str, error: Exception, include_data: bool = True) -> dict[str, object]:
         """Logs error and returns standardized error response."""
-        logging.error(f"Error in {operation}: {error}", exc_info=True)
+        logger.error(f"Error in {operation}: {error}", exc_info=True)
         response = {"error": str(error)}
         if include_data:
             response["data"] = DataValidator.create_empty_data_response()
