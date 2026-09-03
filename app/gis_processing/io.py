@@ -8,6 +8,8 @@ from . import reports, validation
 
 ogr.UseExceptions()
 
+logger = logging.getLogger(__name__)
+
 def inject_traceability_id(dataset_path: Path, output_dir: Path, id_field_name: str) -> Path | None:
     """Create unique IDs for each feature in the dataset."""
     in_ds, out_ds = None, None
@@ -31,7 +33,7 @@ def inject_traceability_id(dataset_path: Path, output_dir: Path, id_field_name: 
             out_layer.CreateFeature(out_feature)
         return output_path
     except Exception as e:
-        logging.error(f"Failed to inject ID for {dataset_path.name}: {e}", exc_info=True)
+        logger.exception(f"Failed to inject ID for {dataset_path.name}: {e}")
         return None
     finally:
         if in_ds: in_ds = None
@@ -67,7 +69,7 @@ def explode_multipart_features(dataset_path: Path, output_dir: Path, id_field_na
                 out_layer.CreateFeature(in_feature)
         return exploded_path
     except Exception as e:
-        logging.error(f"Failed to explode features for {dataset_path.name}: {e}", exc_info=True)
+        logger.exception(f"Failed to explode features for {dataset_path.name}: {e}")
         return None
     finally:
         if in_ds: in_ds = None
@@ -78,10 +80,11 @@ def open_dataset(dataset_path: Path) -> ogr.DataSource | None:
     try:
         return ogr.Open(str(dataset_path), 0)
     except Exception:
+        logger.exception(f"Failed to open dataset {dataset_path.name}")
         return None
 
 def move_and_log_dataset(dataset_path: Path, target_dir: Path, status: str, reason: str, original_name: str, summary_report_path: Path):
-    logging.warning(f"  -> Global issue with {original_name}: {reason}. Moving.")
+    logger.warning(f"  -> Global issue with {original_name}: {reason}. Moving.")
     for component in dataset_path.parent.glob(f'{dataset_path.stem}.*'):
         if component.exists():
             shutil.move(str(component), target_dir / component.name)
@@ -93,8 +96,8 @@ def process_unsupported_files(input_dir: Path, unsupported_dir: Path, summary_re
             try:
                 shutil.move(str(f), unsupported_dir / f.name)
                 reports.log_to_summary_report(summary_report_path, f.name, "UNSUPPORTED", "SKIPPED", {}, "", "Not a trigger GIS file")
-            except Exception as e:
-                logging.warning(f"Could not move unsupported file {f.name}: {e}")
+            except Exception:
+                logger.exception(f"Could not move unsupported file {f.name}")
 
 def delete_intermediate_components(processed_path: Path, traced_dir: Path, original_input_dir: Path):
     try:
@@ -102,8 +105,8 @@ def delete_intermediate_components(processed_path: Path, traced_dir: Path, origi
             if component.exists(): component.unlink()
         for component in original_input_dir.glob(f'{processed_path.stem}.*'):
             component.unlink()
-    except Exception as e:
-        logging.error(f"Failed to delete intermediate or original file components for {processed_path.name}: {e}")
+    except Exception:
+        logger.exception(f"Failed to delete intermediate or original file components for {processed_path.name}")
 
 def get_geojson_feature(session_output_dir: Path, layer_type: str, filename: str, qa_id: str) -> dict[str, object] | None:
     try:
@@ -124,8 +127,8 @@ def get_geojson_feature(session_output_dir: Path, layer_type: str, filename: str
                 break
         ds = None
         return feature_geojson
-    except Exception as e:
-        logging.error(f"Error getting GeoJSON feature: {e}", exc_info=True)
+    except Exception:
+        logger.exception("Error getting GeoJSON feature")
         return None
 
 def _find_dated_output_dir(session_output_dir: Path) -> Path:
