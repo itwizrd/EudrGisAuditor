@@ -1,5 +1,8 @@
 import csv
+import logging
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 def initialize_reports(summary_path: Path, detailed_path: Path):
     """Initialize report CSV files with headers."""
@@ -35,7 +38,7 @@ def log_to_summary_report(summary_path: Path, name: str, initial: str, processin
                 reason
             ])
     except Exception:
-        pass
+        logger.exception(f"Failed to log to summary report for {name}")
 
 def log_detailed_rows_to_report(detailed_path: Path, rows: list[dict[str, object]]):
     """Append multiple rows to the detailed report CSV."""
@@ -47,4 +50,4 @@ def log_detailed_rows_to_report(detailed_path: Path, rows: list[dict[str, object
             writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
             writer.writerows(rows)
     except Exception:
-        pass
+        logger.exception(f"Failed to log to detailed report for {detailed_path}")
