@@ -1,12 +1,15 @@
+import csv
 import json
 import logging
 import shutil
 from pathlib import Path
-from typing import Dict, Any, List, Optional
-import csv
+from typing import Any, Dict, List, Optional
+
 from osgeo import ogr, osr
 
 from ..gis_processing import transformations, validation
+
+logger = logging.getLogger(__name__)
 
 def _find_dated_output_dir(session_output_dir: Path) -> Path:
     """Helper function to find the dated output directory for the session."""
@@ -37,8 +40,8 @@ def save_task_status(session_id: str, status: Dict[str, Any], upload_folder: str
         status_file = session_dir / 'task_status.json'
         with open(status_file, 'w') as f:
             json.dump(status, f)
-    except Exception as e:
-        logging.error(f"Failed to save task status for session {session_id}: {e}")
+    except Exception:
+        logger.exception(f"Failed to save task status for session {session_id}")
 
 def load_task_status(session_id: str, upload_folder: str) -> Optional[Dict[str, Any]]:
     """Loads a task's status from a JSON file."""
@@ -47,8 +50,8 @@ def load_task_status(session_id: str, upload_folder: str) -> Optional[Dict[str, 
         if status_file.exists():
             with open(status_file, 'r') as f:
                 return json.load(f)
-    except Exception as e:
-        logging.error(f"Failed to load task status for session {session_id}: {e}")
+    except Exception:
+        logger.exception(f"Failed to load task status for session {session_id}")
     return None
 
 def get_report_data(session_id: str, upload_folder: str) -> Dict:
@@ -58,7 +61,7 @@ def get_report_data(session_id: str, upload_folder: str) -> Dict:
         dated_output_dir = _find_dated_output_dir(session_output_dir)
         summary_report_path = dated_output_dir / f"summary_report_{dated_output_dir.name}.csv"
         detailed_report_path = dated_output_dir / f"detailed_report_{dated_output_dir.name}.csv"
-        
+
         summary_data, detailed_data = [], []
         if summary_report_path.exists():
             with open(summary_report_path, encoding='utf-8') as f:
@@ -75,21 +78,21 @@ def get_report_data(session_id: str, upload_folder: str) -> Dict:
                 if ds and ds.GetLayer().GetFeatureCount() > 0:
                     original_stem = file_path.stem.replace('_review', '')
                     layers.append({"name": file_path.name, "label": f"{original_stem}.geojson", "type": "review"})
-            except Exception as e:
-                logging.warning(f"Could not read feature count from {file_path.name}: {e}")
-        
+            except Exception:
+                logger.exception(f"Could not read feature count from {file_path.name}")
+
         all_original_files = {p.stem.replace('_exploded', '') for p in list((dated_output_dir / "00a_exploded_features").glob("*.geojson"))}
         files_with_review_layers = {layer['label'].replace('.geojson', '') for layer in layers}
         clean_file_count = len(all_original_files - files_with_review_layers)
-        
+
         return {
             'summary_report_data': summary_data,
             'detailed_report_data': detailed_data,
             'map_layers': layers,
             'clean_file_count': clean_file_count
         }
-    except Exception as e:
-        logging.error(f"Error getting report data for session {session_id}: {e}")
+    except Exception:
+        logger.exception(f"Error getting report data for session {session_id}")
         raise FileNotFoundError(f"Report data not found for session {session_id}")
 
 def get_geojson_layer(session_id: str, layer_type: str, filename: str, upload_folder: str) -> Path:
@@ -97,25 +100,25 @@ def get_geojson_layer(session_id: str, layer_type: str, filename: str, upload_fo
     try:
         session_output_dir = _get_session_output_dir(session_id, upload_folder)
         dated_output_dir = _find_dated_output_dir(session_output_dir)
-        
+
         layer_dirs = {
             'review': "05_processed_review_features",
             'candidates': "06_candidates_for_conversion",
             'valid': "04_processed_valid"
         }
-        
+
         if layer_type not in layer_dirs:
             raise ValueError("Invalid layer type")
-        
+
         base_path = dated_output_dir / layer_dirs[layer_type]
         file_path = base_path / filename
-        
+
         if not file_path.is_file():
             raise FileNotFoundError("File not found")
-        
+
         return file_path
-    except Exception as e:
-        logging.error(f"Error getting geojson layer for session {session_id}: {e}")
+    except Exception:
+        logger.exception(f"Error getting geojson layer for session {session_id}")
         raise FileNotFoundError(f"Layer file not found for session {session_id}")
 
 def get_all_valid_points(session_id: str, upload_folder: str) -> Dict:
@@ -134,13 +137,13 @@ def get_all_valid_points(session_id: str, upload_folder: str) -> Dict:
                     geom = feature.GetGeometryRef()
                     if geom and (geom.GetGeometryType() & 0x000000ff) == ogr.wkbPoint:
                         point_features.append(json.loads(feature.ExportToJson()))
-            except Exception as e:
-                logging.error(f"Failed to read valid points from {file_path}: {e}")
+            except Exception:
+                logger.exception(f"Failed to read valid points from {file_path}")
             finally:
                 if in_ds: del in_ds
         return {"type": "FeatureCollection", "features": point_features}
-    except Exception as e:
-        logging.error(f"Error getting all valid points for session {session_id}: {e}")
+    except Exception:
+        logger.exception(f"Error getting all valid points for session {session_id}")
         raise FileNotFoundError(f"Valid points data not found for session {session_id}")
 
 def convert_to_point(session_id: str, qa_id: str, upload_folder: str) -> bool:
@@ -151,9 +154,9 @@ def convert_to_point(session_id: str, qa_id: str, upload_folder: str) -> bool:
             session_output_dir, [qa_id]
         )
         return converted_count > 0 and qa_id not in failed_ids
-    except Exception as e:
-        logging.error(f"Error converting to point for session {session_id}: {e}")
-        raise e
+    except Exception:
+        logger.exception(f"Error converting to point for session {session_id}")
+        raise
 
 def batch_convert_all(session_id: str, qa_ids: list, upload_folder: str) -> Dict[str, Any]:
     """Converts a list of candidate polygons to points in a single operation."""
@@ -163,18 +166,18 @@ def batch_convert_all(session_id: str, qa_ids: list, upload_folder: str) -> Dict
             session_output_dir, qa_ids
         )
         return {"converted_count": converted_count, "failed_ids": failed_ids}
-    except Exception as e:
-        logging.error(f"Error batch converting all for session {session_id}: {e}")
-        raise e
+    except Exception:
+        logger.exception(f"Error batch converting all for session {session_id}")
+        raise
 
 def consolidate_features(session_id: str, upload_folder: str) -> Optional[Path]:
     """Consolidates all valid features into a single GeoJSON file."""
     try:
         session_output_dir = _get_session_output_dir(session_id, upload_folder)
         return transformations.consolidate_valid_features(session_output_dir)
-    except Exception as e:
-        logging.error(f"Error consolidating features for session {session_id}: {e}")
-        raise e
+    except Exception:
+        logger.exception(f"Error consolidating features for session {session_id}")
+        raise
 
 def create_zip_archive(session_id: str, upload_folder: str):
     """Creates a zip archive of the session's output directory."""
@@ -184,9 +187,9 @@ def create_zip_archive(session_id: str, upload_folder: str):
         zip_base_name = f"eudr_results_{dated_output_dir.name}"
         zip_path = shutil.make_archive(str(session_output_dir / zip_base_name), 'zip', str(dated_output_dir))
         return Path(zip_path)
-    except Exception as e:
-        logging.error(f"Error creating zip archive for session {session_id}: {e}")
-        raise e
+    except Exception:
+        logger.exception(f"Error creating zip archive for session {session_id}")
+        raise
 
 def get_zip_file_path(session_id: str, upload_folder: str) -> Path:
     """Gets the path to the zipped results file."""
@@ -198,6 +201,6 @@ def get_zip_file_path(session_id: str, upload_folder: str) -> Path:
         if not zip_path.is_file():
             raise FileNotFoundError("Zip file not found.")
         return zip_path
-    except Exception as e:
-        logging.error(f"Error getting zip file path for session {session_id}: {e}")
-        raise e
+    except Exception:
+        logger.exception(f"Error getting zip file path for session {session_id}")
+        raise
