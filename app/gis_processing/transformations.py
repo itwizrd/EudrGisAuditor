@@ -6,7 +6,7 @@ from pathlib import Path
 
 from osgeo import ogr, osr
 
-from . import io, reports, validation
+from . import validation
 
 logger = logging.getLogger(__name__)
 
