@@ -1,8 +1,8 @@
-from pathlib import Path
 from collections.abc import Callable
+from pathlib import Path
 
-from . import validation, reports, transformations, io
-from .validation import ID_FIELD_NAME, DATASET_TRIGGERS
+from . import io, reports, transformations, validation
+from .validation import DATASET_TRIGGERS, ID_FIELD_NAME
 
 
 class EudrGisQaAssistant:
