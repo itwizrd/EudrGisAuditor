@@ -2,7 +2,7 @@ import shutil
 import json
 import logging
 from pathlib import Path
-from osgeo import ogr, osr
+from osgeo import ogr
 
 from . import reports, validation
 
@@ -32,8 +32,8 @@ def inject_traceability_id(dataset_path: Path, output_dir: Path, id_field_name: 
             out_feature.SetField(id_field_name, f"{dataset_path.stem}_{i}")
             out_layer.CreateFeature(out_feature)
         return output_path
-    except Exception as e:
-        logger.exception(f"Failed to inject ID for {dataset_path.name}: {e}")
+    except Exception:
+        logger.exception(f"Failed to inject ID for {dataset_path.name}")
         return None
     finally:
         if in_ds: in_ds = None
@@ -68,8 +68,8 @@ def explode_multipart_features(dataset_path: Path, output_dir: Path, id_field_na
             elif geom and geom.GetGeometryType() == ogr.wkbPolygon:
                 out_layer.CreateFeature(in_feature)
         return exploded_path
-    except Exception as e:
-        logger.exception(f"Failed to explode features for {dataset_path.name}: {e}")
+    except Exception:
+        logger.exception(f"Failed to explode features for {dataset_path.name}")
         return None
     finally:
         if in_ds: in_ds = None
