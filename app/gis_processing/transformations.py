@@ -1,12 +1,12 @@
+import csv
 import json
 import logging
-from math import log
 import time
-import csv
 from pathlib import Path
+
 from osgeo import ogr, osr
 
-from . import validation, reports, io
+from . import io, reports, validation
 
 logger = logging.getLogger(__name__)
 
@@ -221,7 +221,7 @@ def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_conve
         valid_filepath = valid_dir / f"{original_stem}_valid.geojson"
 
         if not candidate_filepath.exists():
-            logging.error(f"Candidate file not found: {candidate_filepath}")
+            logger.error(f"Candidate file not found: {candidate_filepath}")
             failed_ids.extend(ids)
             continue
 
@@ -231,8 +231,8 @@ def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_conve
                 with open(valid_filepath, 'r', encoding='utf-8') as f:
                     valid_data = json.load(f)
                     existing_valid_features = valid_data.get('features', [])
-            except Exception as e:
-                logger.error("Failed to read existing valid file %s: %s", valid_filepath, e)
+            except Exception:
+                logger.exception(f"Failed to read existing valid file {valid_filepath}")
                 failed_ids.extend(ids)
                 continue
 
@@ -265,11 +265,11 @@ def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_conve
                         new_point_features.append(feature)
                         candidates_to_remove.append(qa_id)
                         converted_count += 1
-                    except Exception as e:
-                        logger.error(f"Failed to convert {qa_id}: {e}")
+                    except Exception:
+                        logger.exception(f"Failed to convert {qa_id}")
                         failed_ids.append(qa_id)
-        except Exception as e:
-            logger.error(f"Error processing candidates file {candidate_filepath}: {e}")
+        except Exception:
+            logger.exception(f"Error processing candidates file {candidate_filepath}")
             failed_ids.extend(ids)
             continue
 
@@ -314,8 +314,8 @@ def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_conve
                 json.dump(candidates_output, f, indent=2)
 
             time.sleep(0.5)
-        except Exception as e:
-            logger.error(f"Error writing converted features for {original_stem}: {e}")
+        except Exception:
+            logger.exception(f"Error writing converted features for {original_stem}")
             for feature in data['new_features']:
                 qa_id = feature['properties'].get(validation.ID_FIELD_NAME)
                 if qa_id:
@@ -328,8 +328,8 @@ def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_conve
             with open(detailed_report_path, mode='r', newline='', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 detailed_report_data = list(reader)
-        except Exception as e:
-            logger.error(f"Error reading detailed report: {e}")
+        except Exception:
+            logger.exception("Error reading detailed report")
 
     successfully_converted = [qa_id for qa_id in qa_ids_to_convert if qa_id not in failed_ids]
     for row in detailed_report_data:
@@ -344,8 +344,8 @@ def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_conve
                 writer.writeheader()
                 writer.writerows(detailed_report_data)
             time.sleep(0.5)
-        except Exception as e:
-            logger.error(f"Error writing detailed report: {e}")
+        except Exception:
+            logger.exception("Error writing detailed report")
 
     return converted_count, failed_ids
 
@@ -367,7 +367,7 @@ def consolidate_valid_features(session_output_dir: Path) -> Path | None:
                 features = data.get('features', [])
                 all_features.extend(features)
         except Exception:
-            logger.error(f"Error reading {file_path}")
+            logger.exception(f"Error reading {file_path}")
             continue
 
     if all_features:
