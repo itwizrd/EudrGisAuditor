@@ -3,11 +3,11 @@ import json
 import logging
 import shutil
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from osgeo import ogr, osr
+from osgeo import ogr
 
-from ..gis_processing import transformations, validation
+from ..gis_processing import transformations
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ def _get_session_output_dir(session_id: str, upload_folder: str) -> Path:
         raise FileNotFoundError("Output directory not found for this session.")
     return output_dir
 
-def save_task_status(session_id: str, status: Dict[str, Any], upload_folder: str):
+def save_task_status(session_id: str, status: dict[str, Any], upload_folder: str):
     """Saves the current task status to a JSON file."""
     try:
         session_dir = Path(upload_folder) / session_id
@@ -43,7 +43,7 @@ def save_task_status(session_id: str, status: Dict[str, Any], upload_folder: str
     except Exception:
         logger.exception(f"Failed to save task status for session {session_id}")
 
-def load_task_status(session_id: str, upload_folder: str) -> Optional[Dict[str, Any]]:
+def load_task_status(session_id: str, upload_folder: str) -> dict[str, Any] | None:
     """Loads a task's status from a JSON file."""
     try:
         status_file = Path(upload_folder) / session_id / 'task_status.json'
@@ -54,7 +54,7 @@ def load_task_status(session_id: str, upload_folder: str) -> Optional[Dict[str, 
         logger.exception(f"Failed to load task status for session {session_id}")
     return None
 
-def get_report_data(session_id: str, upload_folder: str) -> Dict:
+def get_report_data(session_id: str, upload_folder: str) -> dict:
     """Retrieves and consolidates all report data for a session."""
     try:
         session_output_dir = _get_session_output_dir(session_id, upload_folder)
@@ -121,7 +121,7 @@ def get_geojson_layer(session_id: str, layer_type: str, filename: str, upload_fo
         logger.exception(f"Error getting geojson layer for session {session_id}")
         raise FileNotFoundError(f"Layer file not found for session {session_id}")
 
-def get_all_valid_points(session_id: str, upload_folder: str) -> Dict:
+def get_all_valid_points(session_id: str, upload_folder: str) -> dict:
     """Consolidates all valid point features into a single GeoJSON FeatureCollection."""
     try:
         session_output_dir = _get_session_output_dir(session_id, upload_folder)
@@ -158,7 +158,7 @@ def convert_to_point(session_id: str, qa_id: str, upload_folder: str) -> bool:
         logger.exception(f"Error converting to point for session {session_id}")
         raise
 
-def batch_convert_all(session_id: str, qa_ids: list, upload_folder: str) -> Dict[str, Any]:
+def batch_convert_all(session_id: str, qa_ids: list, upload_folder: str) -> dict[str, Any]:
     """Converts a list of candidate polygons to points in a single operation."""
     try:
         session_output_dir = _get_session_output_dir(session_id, upload_folder)
@@ -170,7 +170,7 @@ def batch_convert_all(session_id: str, qa_ids: list, upload_folder: str) -> Dict
         logger.exception(f"Error batch converting all for session {session_id}")
         raise
 
-def consolidate_features(session_id: str, upload_folder: str) -> Optional[Path]:
+def consolidate_features(session_id: str, upload_folder: str) -> Path | None:
     """Consolidates all valid features into a single GeoJSON file."""
     try:
         session_output_dir = _get_session_output_dir(session_id, upload_folder)
