@@ -11,6 +11,9 @@ from werkzeug.utils import secure_filename
 from .gis_processing.core import EudrGisQaAssistant
 from .services import data_service
 
+
+logger = logging.getLogger(__name__)
+
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = os.getenv('UPLOAD_FOLDER', './uploads')
 
@@ -52,7 +55,7 @@ def process_files():
     try:
         if 'files' not in request.files:
             return jsonify({"error": "No files uploaded"}), 400
-            
+
         files = request.files.getlist('files')
         if not files or all(file.filename == '' for file in files):
             return jsonify({"error": "No valid files selected"}), 400
@@ -60,7 +63,7 @@ def process_files():
         session_id = str(uuid.uuid4())
         session_input_dir = Path(app.config['UPLOAD_FOLDER']) / session_id / 'input'
         session_output_dir = Path(app.config['UPLOAD_FOLDER']) / session_id / 'output'
-        
+
         session_input_dir.mkdir(parents=True, exist_ok=True)
 
         for file in files:
@@ -71,8 +74,8 @@ def process_files():
                     file.save(file_path)
 
         tasks[session_id] = {
-            'progress': 0, 
-            'message': 'Initializing...', 
+            'progress': 0,
+            'message': 'Initializing...',
             'step': 'Preparing...',
             'finished': False,
             'error': False
@@ -86,11 +89,11 @@ def process_files():
         ))
         thread.daemon = True
         thread.start()
-        
+
         return jsonify({"session_id": session_id})
-        
-    except Exception as e:
-        logging.error(f"Error in process_files: {e}", exc_info=True)
+
+    except Exception:
+        logger.exception("Error in process_files")
         return jsonify({"error": "Internal server error"}), 500
 
 @app.route('/status/<session_id>')
@@ -98,7 +101,7 @@ def task_status(session_id: str):
     """Provides the current status of a processing task."""
     try:
         validate_path(Path(app.config['UPLOAD_FOLDER']), session_id)
-        
+
         status = tasks.get(session_id)
         if not status:
             status = data_service.load_task_status(session_id, app.config['UPLOAD_FOLDER'])
@@ -106,24 +109,24 @@ def task_status(session_id: str):
                 tasks[session_id] = status
             else:
                 return jsonify({"error": "Session not found"}), 404
-                
+
         return jsonify(status)
     except Exception as e:
-        logging.error(f"Error getting status: {e}", exc_info=True)
-        return jsonify({"error": "Error retrieving status"}), 500
+        logger.exception("Error getting status")
+        return jsonify({"error": f"Error retrieving status: {e}"}), 500
 
 @app.route('/api/data/<session_id>')
 def get_session_data(session_id: str):
     """API endpoint to get consolidated session data for the dashboard."""
     try:
         validate_path(Path(app.config['UPLOAD_FOLDER']), session_id)
-        
+
         task = tasks.get(session_id) or data_service.load_task_status(session_id, app.config['UPLOAD_FOLDER'])
         if not task:
             return jsonify({
                 "error": "Session not found"
             }), 404
-            
+
         if not task.get('finished') or task.get('error'):
             return jsonify({
                 "error": "Session not complete or failed"
@@ -134,23 +137,23 @@ def get_session_data(session_id: str):
             return jsonify({
                 "error": "No data available"
             }), 404
-                
+
         return jsonify(data)
-            
+
     except FileNotFoundError:
         return jsonify({"error": "Data files not found"}), 404
     except Exception as e:
-        logging.error(f"Error reading session data: {e}", exc_info=True)
-        return jsonify({"error": f"Error reading session data: {str(e)}"}), 500
-        
+        logger.exception("Error reading session data")
+        return jsonify({"error": f"Error reading session data: {e}"}), 500
+
 @app.route('/results/<session_id>')
 def show_results(session_id: str):
     """Renders the results dashboard page."""
     try:
         validate_path(Path(app.config['UPLOAD_FOLDER']), session_id)
         return render_template('results.html', session_id=session_id)
-    except Exception as e:
-        logging.error(f"Error showing results page for session {session_id}: {e}", exc_info=True)
+    except Exception:
+        logger.exception(f"Error showing results page for session {session_id}")
         return "Session not found", 404
 
 @app.route('/download/<session_id>')
@@ -166,8 +169,8 @@ def download_results(session_id: str):
         )
     except FileNotFoundError:
         return jsonify({"error": "File not found"}), 404
-    except Exception as e:
-        logging.error(f"Error downloading results for session {session_id}: {e}", exc_info=True)
+    except Exception:
+        logger.exception(f"Error downloading results for session {session_id}")
         return jsonify({"error": "Download error"}), 500
 
 @app.route('/api/geojson/<session_id>/<layer_type>/<filename>')
@@ -178,8 +181,8 @@ def get_geojson_layer(session_id: str, layer_type: str, filename: str):
         return send_from_directory(directory=str(file_path.parent), path=file_path.name)
     except FileNotFoundError:
         return jsonify({"error": "Layer not found"}), 404
-    except Exception as e:
-        logging.error(f"Error getting geojson layer for session {session_id}: {e}", exc_info=True)
+    except Exception:
+        logger.exception(f"Error getting geojson layer for session {session_id}")
         return jsonify({"error": "Error retrieving layer"}), 500
 
 @app.route('/api/all_valid_points/<session_id>')
@@ -192,8 +195,8 @@ def get_all_valid_points(session_id: str):
         return jsonify(geojson_data)
     except FileNotFoundError:
         return jsonify({"type": "FeatureCollection", "features": []})
-    except Exception as e:
-        logging.error(f"Error getting all valid points for session {session_id}: {e}", exc_info=True)
+    except Exception:
+        logger.exception(f"Error getting all valid points for session {session_id}")
         return jsonify({"error": "Error retrieving data"}), 500
 
 @app.route('/api/convert/<session_id>/<qa_id>', methods=['POST'])
@@ -203,7 +206,7 @@ def convert_to_point(session_id: str, qa_id: str):
         success = data_service.convert_to_point(session_id, qa_id, app.config['UPLOAD_FOLDER'])
         return jsonify({"success": success})
     except Exception as e:
-        logging.error(f"Error converting to point for session {session_id}: {e}", exc_info=True)
+        logger.exception(f"Error converting to point for session {session_id}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/api/convert_all/<session_id>', methods=['POST'])
@@ -214,11 +217,11 @@ def convert_all_to_point(session_id: str):
         qa_ids = data.get('qa_ids', [])
         if not qa_ids:
             return jsonify({"success": False, "error": "No QA IDs provided"}), 400
-            
+
         result = data_service.batch_convert_all(session_id, qa_ids, app.config['UPLOAD_FOLDER'])
         return jsonify({"success": True, **result})
     except Exception as e:
-        logging.error(f"Error converting all to points for session {session_id}: {e}", exc_info=True)
+        logger.exception(f"Error converting all to points for session {session_id}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/api/consolidate/<session_id>')
@@ -228,14 +231,14 @@ def consolidate_features(session_id: str):
         consolidated_path = data_service.consolidate_features(session_id, app.config['UPLOAD_FOLDER'])
         if not consolidated_path:
             return jsonify({"error": "No valid features found"}), 404
-        
+
         return send_file(
             consolidated_path,
             as_attachment=True,
             download_name='consolidated_valid_features.geojson'
         )
-    except Exception as e:
-        logging.error(f"Error consolidating features for session {session_id}: {e}", exc_info=True)
+    except Exception:
+        logger.exception(f"Error consolidating features for session {session_id}")
         return jsonify({"error": "Consolidation error"}), 500
 
 @app.route('/cleanup/<session_id>', methods=['POST'])
@@ -245,13 +248,13 @@ def cleanup_session_data(session_id: str):
         session_dir = validate_path(Path(app.config['UPLOAD_FOLDER']), session_id)
         if session_dir.exists():
             shutil.rmtree(session_dir)
-        
+
         if session_id in tasks:
             del tasks[session_id]
-        
+
         return jsonify({"success": True})
     except Exception as e:
-        logging.error(f"Error cleaning up session {session_id}: {e}", exc_info=True)
+        logger.exception(f"Error cleaning up session {session_id}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 def run_gis_task(session_id, input_dir, output_dir, simplify, autofix, identify_candidates):
@@ -268,10 +271,10 @@ def run_gis_task(session_id, input_dir, output_dir, simplify, autofix, identify_
 
         assistant = EudrGisQaAssistant(input_dir, str(dated_output_dir), simplify, autofix, identify_candidates)
         assistant.run(update_progress=update_progress)
-        
+
         update_progress({
-            'progress': 95, 
-            'message': 'Creating archive...', 
+            'progress': 95,
+            'message': 'Creating archive...',
             'step': 'Step 5/5: Finalizing'
         })
 
@@ -286,12 +289,13 @@ def run_gis_task(session_id, input_dir, output_dir, simplify, autofix, identify_
             'error': False
         })
         data_service.save_task_status(session_id, tasks[session_id], Path(app.config['UPLOAD_FOLDER']))
-        
+
     except Exception as e:
+        logger.exception(f"Error running GIS task for session {session_id}")
         tasks[session_id].update({
-            'progress': 100, 
-            'message': f'Error: {str(e)}', 
-            'error': True, 
+            'progress': 100,
+            'message': f'Error: {str(e)}',
+            'error': True,
             'finished': True,
             'step': 'Error'
         })
@@ -303,4 +307,4 @@ def run_gis_task(session_id, input_dir, output_dir, simplify, autofix, identify_
             if output_dir_path.exists() and len(list(output_dir_path.iterdir())) > 0:
                 shutil.rmtree(output_dir_path, ignore_errors=True)
         except Exception:
-            pass
+            logger.exception(f"Error cleaning up directories for session {session_id}")
