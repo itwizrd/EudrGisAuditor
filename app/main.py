@@ -2,7 +2,6 @@ import os
 import uuid
 import logging
 import shutil
-import json
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_from_directory, send_file
 from threading import Thread
