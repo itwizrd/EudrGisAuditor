@@ -1,6 +1,8 @@
+import logging
+
 from osgeo import ogr, osr
 
-from . import const_iso2
+from . import const
 
 ID_FIELD_NAME: str = "qa_assistant_id"
 MIN_AREA_HA_FOR_POLYGON: float = 4.0
@@ -8,7 +10,8 @@ METERS_SQ_PER_HECTARE: float = 10000.0
 SIMPLIFY_TOLERANCE: float = 0.0001
 OPTIONAL_FIELDS: list[str] = ['ProductionPlace', 'ProducerName', 'ProducerCountry', 'Area']
 DATASET_TRIGGERS: set[str] = {".shp", ".geojson"}
-VALID_ISO2_CODES = const_iso2.VALID_ISO2_CODES
+
+logger = logging.getLogger(__name__)
 
 def validate_global_crs(ds: ogr.DataSource) -> bool:
     """
@@ -33,6 +36,7 @@ def validate_global_crs(ds: ogr.DataSource) -> bool:
         return srs.IsSame(wgs84_srs)
 
     except Exception:
+        logger.exception("validate_global_crs: exception at ds.GetLayer")
         return False
 
 def get_all_points(geom: ogr.Geometry) -> list[tuple[float, float]]:
@@ -53,9 +57,9 @@ def validate_geometry_vertices(geom: ogr.Geometry) -> tuple[bool, str]:
         return True, ""
     for lon, lat in get_all_points(geom):
         if not (-180.0 <= lon <= 180.0 and -90.0 <= lat <= 90.0):
-            return False, f"Invalid coordinate range: [{lon:.5f}, {lat:.5f}]"
+            return False, f"Invalid coordinate range: [{lon:.{const.DECIMAL}f}, {lat:.{const.DECIMAL}f}]"
         # Check for excessive decimal places (6 decimal places max)
-        if lon != round(lon, 6) or lat != round(lat, 6):
+        if lon != round(lon, const.DECIMAL) or lat != round(lat, const.DECIMAL):
             return False, f"Excessive decimal places: [{lon}, {lat}]"
     return True, ""
 
@@ -67,7 +71,7 @@ def check_optional_properties(feature: ogr.Feature) -> str:
         if field_index == -1: notes.append("Not included"); continue
         value = feature.GetField(field_index)
         if field_name == 'ProducerCountry':
-            if isinstance(value, str) and value.upper() in VALID_ISO2_CODES: notes.append("OK")
+            if isinstance(value, str) and value.upper() in const.VALID_ISO2_CODES: notes.append("OK")
             else: notes.append(f"Invalid value: '{value}'")
         elif field_name == 'Area':
             if isinstance(value, (int, float)): notes.append("OK")

@@ -6,15 +6,15 @@ from pathlib import Path
 
 from osgeo import ogr, osr
 
-from . import validation
+from . import const, validation
 
 logger = logging.getLogger(__name__)
 
-def round_geometry(geom: ogr.Geometry, precision: int = 6) -> ogr.Geometry:
+def round_geometry(geom: ogr.Geometry, precision: int = const.DECIMAL) -> ogr.Geometry:
     """Rounds the geometry vertices to the specified precision."""
     for i in range(geom.GetPointCount()):
         x, y = geom.GetPoint_2D(i)
-        geom.SetPoint_2D(i, format(x, f'.{precision}f'), format(y, f'.{precision}f'))
+        geom.SetPoint_2D(i, format(x, f'.{const.DECIMAL}f'), format(y, f'.{const.DECIMAL}f'))
     for i in range(geom.GetGeometryCount()):
         round_geometry(geom.GetGeometryRef(i), precision)
     return geom
@@ -185,7 +185,7 @@ def validate_and_fix_geometry(geom, autofix: bool, simplify: bool) -> tuple[bool
         return False, "Polygon with holes not supported", None
 
     if autofix:
-        round_geometry(geom, 6)
+        round_geometry(geom, validation.DECIMAL)
         return True, "Valid", "Auto-fixed (decimal places rounded)"
 
     valid_verts, reason = validation.validate_geometry_vertices(geom)

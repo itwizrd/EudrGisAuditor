@@ -1,5 +1,6 @@
-# source: 2026-08-13 https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2, https://www.iso.org/obp/ui/#search
+DECIMAL: int = 6
 VALID_ISO2_CODES: set[str] = {
+    # source: 2026-08-13 https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2, https://www.iso.org/obp/ui/#search
     'AD',
     'AE',
     'AF',
