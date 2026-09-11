@@ -1,4 +1,3 @@
-import os
 from app.main import app
 
 HOST = '0.0.0.0'
