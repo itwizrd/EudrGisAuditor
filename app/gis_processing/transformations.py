@@ -2,19 +2,21 @@ import csv
 import json
 import logging
 import time
+from math import trunc
 from pathlib import Path
 
+import const
+import validation
 from osgeo import ogr, osr
-
-from . import const, validation
 
 logger = logging.getLogger(__name__)
 
 def round_geometry(geom: ogr.Geometry, precision: int = const.DECIMAL) -> ogr.Geometry:
     """Rounds the geometry vertices to the specified precision."""
+    p = 10 ** precision
     for i in range(geom.GetPointCount()):
         x, y = geom.GetPoint_2D(i)
-        geom.SetPoint_2D(i, format(x, f'.{const.DECIMAL}f'), format(y, f'.{const.DECIMAL}f'))
+        geom.SetPoint_2D(i, (trunc(x * p) / p), (trunc(y * p) / p))
     for i in range(geom.GetGeometryCount()):
         round_geometry(geom.GetGeometryRef(i), precision)
     return geom
@@ -185,7 +187,7 @@ def validate_and_fix_geometry(geom, autofix: bool, simplify: bool) -> tuple[bool
         return False, "Polygon with holes not supported", None
 
     if autofix:
-        round_geometry(geom, validation.DECIMAL)
+        round_geometry(geom, const.DECIMAL)
         return True, "Valid", "Auto-fixed (decimal places rounded)"
 
     valid_verts, reason = validation.validate_geometry_vertices(geom)

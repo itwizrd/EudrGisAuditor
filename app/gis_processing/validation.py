@@ -1,8 +1,8 @@
 import logging
+from math import trunc
 
+from const import DECIMAL, VALID_ISO2_CODES
 from osgeo import ogr, osr
-
-from . import const
 
 ID_FIELD_NAME: str = "qa_assistant_id"
 MIN_AREA_HA_FOR_POLYGON: float = 4.0
@@ -52,14 +52,22 @@ def get_all_points(geom: ogr.Geometry) -> list[tuple[float, float]]:
     return points
 
 def validate_geometry_vertices(geom: ogr.Geometry) -> tuple[bool, str]:
-    """Validates that all geometry vertices are within valid geographic bounds."""
+    """
+    Validates that all geometry vertices are within valid geographic bounds.
+    Checks for excessive decimal places.
+    Args:
+        geom: The geometry object to validate.
+    Returns:
+        A tuple of (is_valid, error_message).
+    """
+    precision = 10 ** DECIMAL
     if not geom or geom.IsEmpty():
         return True, ""
     for lon, lat in get_all_points(geom):
         if not (-180.0 <= lon <= 180.0 and -90.0 <= lat <= 90.0):
-            return False, f"Invalid coordinate range: [{lon:.{const.DECIMAL}f}, {lat:.{const.DECIMAL}f}]"
-        # Check for excessive decimal places (6 decimal places max)
-        if lon != round(lon, const.DECIMAL) or lat != round(lat, const.DECIMAL):
+            return False, f"Invalid coordinate range: [{lon}, {lat}]"
+        # Check for excessive decimal places (const.DECIMAL) rounded DOWN
+        if lon != (trunc(lon * precision) / precision) or lat != (trunc(lat * precision) / precision):
             return False, f"Excessive decimal places: [{lon}, {lat}]"
     return True, ""
 
@@ -71,7 +79,7 @@ def check_optional_properties(feature: ogr.Feature) -> str:
         if field_index == -1: notes.append("Not included"); continue
         value = feature.GetField(field_index)
         if field_name == 'ProducerCountry':
-            if isinstance(value, str) and value.upper() in const.VALID_ISO2_CODES: notes.append("OK")
+            if isinstance(value, str) and value.upper() in VALID_ISO2_CODES: notes.append("OK")
             else: notes.append(f"Invalid value: '{value}'")
         elif field_name == 'Area':
             if isinstance(value, (int, float)): notes.append("OK")
