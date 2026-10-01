@@ -1,8 +1,9 @@
 import logging
 from math import trunc
 
-from const import DECIMAL, VALID_ISO2_CODES
 from osgeo import ogr, osr
+
+from .const import DECIMAL, VALID_ISO2_CODES
 
 ID_FIELD_NAME: str = "qa_assistant_id"
 MIN_AREA_HA_FOR_POLYGON: float = 4.0
