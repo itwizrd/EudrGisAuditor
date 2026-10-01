@@ -258,7 +258,7 @@ def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_conve
                         if not centroid:
                             failed_ids.append(qa_id)
                             continue
-                        round_geometry(centroid, 6)
+                        centroid = round_geometry(centroid, 6)
 
                         feature['geometry'] = json.loads(centroid.ExportToJson())
                         if 'Area' in feature['properties']:
