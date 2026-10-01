@@ -5,9 +5,9 @@ import time
 from math import trunc
 from pathlib import Path
 
-import const
-import validation
 from osgeo import ogr, osr
+
+from . import const, validation
 
 logger = logging.getLogger(__name__)
 
