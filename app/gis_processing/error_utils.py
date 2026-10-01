@@ -75,8 +75,8 @@ class ErrorHandler:
     @staticmethod
     def handle_processing_error(operation: str, error: Exception) -> dict[str, object]:
         """Standard response for processing errors."""
-        message = f"{operation} failed: {str(error)}"
-        logger.error(message, exc_info=True)
+        message = f"{operation} failed: {error}"
+        logger.exception(message)
         return {"error": "Processing error", "data": DataValidator.create_empty_data_response()}
 
     @staticmethod
