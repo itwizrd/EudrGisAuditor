@@ -11,14 +11,14 @@ from . import const, validation
 
 logger = logging.getLogger(__name__)
 
-def round_geometry(geom: ogr.Geometry, precision: int = const.DECIMAL) -> ogr.Geometry:
+def trunc_decimal(geom: ogr.Geometry, precision: int = const.DECIMAL) -> ogr.Geometry:
     """Rounds the geometry vertices to the specified precision."""
     p = 10 ** precision
     for i in range(geom.GetPointCount()):
         x, y = geom.GetPoint_2D(i)
         geom.SetPoint_2D(i, (trunc(x * p) / p), (trunc(y * p) / p))
     for i in range(geom.GetGeometryCount()):
-        round_geometry(geom.GetGeometryRef(i), precision)
+        trunc_decimal(geom.GetGeometryRef(i), precision)
     return geom
 
 def get_area_in_hectares(geom: ogr.Geometry) -> float | None:
@@ -187,7 +187,7 @@ def validate_and_fix_geometry(geom, autofix: bool, simplify: bool) -> tuple[bool
         return False, "Polygon with holes not supported", None
 
     if autofix:
-        round_geometry(geom, const.DECIMAL)
+        trunc_decimal(geom, const.DECIMAL)
         return True, "Valid", "Auto-fixed (decimal places rounded)"
 
     valid_verts, reason = validation.validate_geometry_vertices(geom)
@@ -258,7 +258,7 @@ def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_conve
                         if not centroid:
                             failed_ids.append(qa_id)
                             continue
-                        centroid = round_geometry(centroid, const.DECIMAL)
+                        centroid = trunc_decimal(centroid, const.DECIMAL)
 
                         feature['geometry'] = json.loads(centroid.ExportToJson())
                         if 'Area' in feature['properties']:
