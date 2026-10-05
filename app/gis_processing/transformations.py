@@ -88,7 +88,7 @@ def partition_and_process_dataset(ds: ogr.DataSource, dataset_stem: str, valid_d
         qa_id = in_feature.GetField(validation.ID_FIELD_NAME)
         attribute_status = validation.check_optional_properties(in_feature)
 
-        is_valid, reason, action_taken = validate_and_fix_geometry(geom, autofix, simplify)
+        is_valid, geom, reason, action_taken = validate_and_fix_geometry(geom, autofix, simplify)
         if action_taken == "Auto-fixed":
             stats['autofixed'] += 1
 
@@ -163,42 +163,49 @@ def partition_and_process_dataset(ds: ogr.DataSource, dataset_stem: str, valid_d
     del review_ds, candidates_ds, valid_ds
     return stats, detailed_rows
 
-def validate_and_fix_geometry(geom, autofix: bool, simplify: bool) -> tuple[bool, str, str | None]:
+def validate_and_fix_geometry(
+    geom: ogr.Geometry,
+    autofix: bool,
+    simplify: bool
+) -> tuple[bool, ogr.Geometry | None, str, str | None]:
     """Validates and optionally fixes geometry issues."""
     if not geom or geom.IsEmpty():
-        return False, "Missing or empty geometry", None
+        return False, None, "Missing or empty geometry", None
 
     geom_type = geom.GetGeometryType() & 0x000000ff
-    if geom_type in [ogr.wkbLineString, ogr.wkbMultiLineString]:
-        return False, "Invalid geometry type (LineString)", None
 
-    if not geom.IsValid():
+    if geom_type in [ogr.wkbLineString, ogr.wkbMultiLineString]:
+        return False, geom, "Invalid geometry type (LineString)", None
+
+    processed_geom = geom.Clone()
+
+    if not processed_geom.IsValid():
         if autofix:
-            fixed_geom = geom.Buffer(0)
+            fixed_geom = processed_geom.Buffer(0)
             if fixed_geom and not fixed_geom.IsEmpty() and fixed_geom.IsValid():
-                geom = fixed_geom
-                return True, "Valid", "Auto-fixed (buffer)"
+                processed_geom = fixed_geom
+                return True, processed_geom, "Valid", "Auto-fixed (buffer)"
             else:
-                return False, "Invalid geometry (unfixable)", None
+                return False, processed_geom, "Invalid geometry (unfixable)", None
         else:
-            return False, "Invalid geometry", None
+            return False, processed_geom, "Invalid geometry", None
 
     if geom_type == ogr.wkbPolygon and geom.GetGeometryCount() > 1:
-        return False, "Polygon with holes not supported", None
+        return False, processed_geom, "Polygon with holes not supported", None
+
+    valid_verts, reason = validation.validate_geometry_vertices(processed_geom)
+    if not valid_verts:
+        return False, processed_geom, reason, None
 
     if autofix:
-        trunc_decimal(geom, const.DECIMAL)
-        return True, "Valid", "Auto-fixed (decimal places rounded)"
-
-    valid_verts, reason = validation.validate_geometry_vertices(geom)
-    if not valid_verts:
-        return False, reason, None
+        trunc_decimal(processed_geom, const.DECIMAL)
+        return True, processed_geom, "Valid", "Auto-fixed (decimal places rounded)"
 
     if simplify and geom_type == ogr.wkbPolygon:
-        geom = geom.SimplifyPreserveTopology(validation.SIMPLIFY_TOLERANCE)
-        return True, "Valid", "Simplified"
+        simplified_geom = processed_geom.SimplifyPreserveTopology(validation.SIMPLIFY_TOLERANCE)
+        return True, simplified_geom, "Valid", "Simplified"
 
-    return True, "Valid", None
+    return True, processed_geom, "Valid", None
 
 def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_convert: list[str]) -> tuple[int, list[str]]:
     """Converts candidate polygons to points in a batch operation."""
