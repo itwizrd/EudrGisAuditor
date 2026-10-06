@@ -133,6 +133,7 @@ def partition_and_process_dataset(ds: ogr.DataSource, dataset_stem: str, valid_d
         valid_feature.SetFrom(in_feature)
         valid_feature.SetGeometry(geom)
 
+        # geometry type as hex (https://en.wikipedia.org/wiki/Well-known_text_representation_of_geometry#Well-known_binary)
         geom_type = geom.GetGeometryType() & 0x000000ff
         if (identify_candidates and geom_type == ogr.wkbPolygon and
             area_ha < validation.MIN_AREA_HA_FOR_POLYGON):
@@ -172,7 +173,6 @@ def validate_and_fix_geometry(
     if not geom or geom.IsEmpty():
         return False, None, "Missing or empty geometry", None
 
-    # geometry type as hex
     geom_type = geom.GetGeometryType() & 0x000000ff
 
     if geom_type in [ogr.wkbLineString, ogr.wkbMultiLineString]:
