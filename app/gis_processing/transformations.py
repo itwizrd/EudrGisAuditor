@@ -172,6 +172,7 @@ def validate_and_fix_geometry(
     if not geom or geom.IsEmpty():
         return False, None, "Missing or empty geometry", None
 
+    # geometry type as hex
     geom_type = geom.GetGeometryType() & 0x000000ff
 
     if geom_type in [ogr.wkbLineString, ogr.wkbMultiLineString]:
