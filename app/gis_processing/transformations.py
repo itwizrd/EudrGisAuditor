@@ -25,7 +25,6 @@ def get_area_in_hectares(geom: ogr.Geometry) -> float | None:
     """Calculates geometry area in hectares using appropriate projection."""
     if not geom or geom.IsEmpty():
         return 0.0
-
     centroid = geom.Centroid()
     if not centroid:
         return None
@@ -89,7 +88,7 @@ def partition_and_process_dataset(ds: ogr.DataSource, dataset_stem: str, valid_d
         attribute_status = validation.check_optional_properties(in_feature)
 
         is_valid, geom, reason, action_taken = validate_and_fix_geometry(geom, autofix, simplify)
-        if action_taken == "Auto-fixed":
+        if action_taken:
             stats['autofixed'] += 1
 
         if not is_valid:
@@ -179,34 +178,40 @@ def validate_and_fix_geometry(
         return False, geom, "Invalid geometry type (LineString)", None
 
     processed_geom = geom.Clone()
-
-    if not processed_geom.IsValid():
-        if autofix:
-            fixed_geom = processed_geom.Buffer(0)
-            if fixed_geom and not fixed_geom.IsEmpty() and fixed_geom.IsValid():
-                processed_geom = fixed_geom
-                return True, processed_geom, "Valid", "Auto-fixed (buffer)"
-            else:
-                return False, processed_geom, "Invalid geometry (unfixable)", None
-        else:
-            return False, processed_geom, "Invalid geometry", None
-
-    if geom_type == ogr.wkbPolygon and geom.GetGeometryCount() > 1:
-        return False, processed_geom, "Polygon with holes not supported", None
-
     valid_verts, reason = validation.validate_geometry_vertices(processed_geom)
     if not valid_verts:
         return False, processed_geom, reason, None
 
-    if autofix:
-        trunc_decimal(processed_geom, const.DECIMAL)
-        return True, processed_geom, "Valid", "Auto-fixed (decimal places rounded)"
+    actions = []
+
+    processed_geom = trunc_decimal(processed_geom, const.DECIMAL)
+    actions.append("Coordinates truncated to 6 decimal places")
+
+    if not processed_geom.IsValid():
+        if not autofix:
+            return False, processed_geom, "Invalid geometry after truncation", None
+        fixed_geom = processed_geom.Buffer(0)
+        if not fixed_geom or fixed_geom.IsEmpty() and not fixed_geom.IsValid():
+            return False, processed_geom, "Invalid geometry after trunc; Buffer(0) failed", None
+        processed_geom = fixed_geom
+        actions.append("Repaired with buffer(0)")
+
+    if geom_type == ogr.wkbPolygon and geom.GetGeometryCount() > 1:
+        return False, processed_geom, "Polygon with holes not supported", "; ".join(actions)
 
     if simplify and geom_type == ogr.wkbPolygon:
         simplified_geom = processed_geom.SimplifyPreserveTopology(validation.SIMPLIFY_TOLERANCE)
-        return True, simplified_geom, "Valid", "Simplified"
+        if not simplified_geom or simplified_geom.IsEmpty():
+            return False, processed_geom, "Simplification produced empty geometry", "; ".join(actions)
+        simplified_geom = trunc_decimal(simplified_geom, const.DECIMAL)
 
-    return True, processed_geom, "Valid", None
+        if not simplified_geom.IsValid():
+            return False, simplified_geom, "geometry invalid after simplification", "; ".join(actions)
+
+        processed_geom = simplified_geom
+        actions.append("Simplified")
+    actions_taken = "; ".join(actions) if actions else None
+    return True, processed_geom, "Valid", actions_taken
 
 def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_convert: list[str]) -> tuple[int, list[str]]:
     """Converts candidate polygons to points in a batch operation."""
