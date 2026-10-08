@@ -1,15 +1,15 @@
-import os
-import uuid
 import logging
+import os
 import shutil
+import uuid
 from pathlib import Path
-from flask import Flask, render_template, request, jsonify, send_from_directory, send_file
 from threading import Thread
+
+from flask import Flask, jsonify, render_template, request, send_file, send_from_directory
 from werkzeug.utils import secure_filename
 
 from .gis_processing.core import EudrGisQaAssistant
 from .services import data_service
-
 
 logger = logging.getLogger(__name__)
 
