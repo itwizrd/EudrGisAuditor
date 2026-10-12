@@ -8,7 +8,6 @@ from .const import DECIMAL, VALID_ISO2_CODES
 ID_FIELD_NAME: str = "qa_assistant_id"
 MIN_AREA_HA_FOR_POLYGON: float = 4.0
 METERS_SQ_PER_HECTARE: float = 10000.0
-SIMPLIFY_TOLERANCE: float = 0.0001
 OPTIONAL_FIELDS: list[str] = ['ProductionPlace', 'ProducerName', 'ProducerCountry', 'Area']
 DATASET_TRIGGERS: set[str] = {".shp", ".geojson"}
 

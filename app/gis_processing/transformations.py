@@ -52,8 +52,8 @@ def get_area_in_hectares(geom: ogr.Geometry) -> float | None:
         return None
 
 def partition_and_process_dataset(ds: ogr.DataSource, dataset_stem: str, valid_dir: Path,
-                                review_dir: Path, candidates_dir: Path, simplify: bool,
-                                autofix: bool, identify_candidates: bool) -> tuple[dict[str, int], list[dict[str, str | None]]]:
+                                review_dir: Path, candidates_dir: Path, autofix: bool,
+                                identify_candidates: bool) -> tuple[dict[str, int], list[dict[str, str | None]]]:
     """Partitions dataset features into valid, review, and candidate categories."""
     stats = {'total': 0, 'valid_large': 0, 'review': 0, 'autofixed': 0, 'candidates': 0}
     detailed_rows = []
@@ -87,7 +87,7 @@ def partition_and_process_dataset(ds: ogr.DataSource, dataset_stem: str, valid_d
         qa_id = in_feature.GetField(validation.ID_FIELD_NAME)
         attribute_status = validation.check_optional_properties(in_feature)
 
-        is_valid, geom, reason, action_taken = validate_and_fix_geometry(geom, autofix, simplify)
+        is_valid, geom, reason, action_taken = validate_and_fix_geometry(geom, autofix)
         if action_taken:
             stats['autofixed'] += 1
 
@@ -166,7 +166,6 @@ def partition_and_process_dataset(ds: ogr.DataSource, dataset_stem: str, valid_d
 def validate_and_fix_geometry(
     geom: ogr.Geometry,
     autofix: bool,
-    simplify: bool
 ) -> tuple[bool, ogr.Geometry | None, str, str | None]:
     """Validates and optionally fixes geometry issues."""
     if not geom or geom.IsEmpty():
@@ -199,17 +198,6 @@ def validate_and_fix_geometry(
     if geom_type == ogr.wkbPolygon and geom.GetGeometryCount() > 1:
         return False, processed_geom, "Polygon with holes not supported", "; ".join(actions)
 
-    if simplify and geom_type == ogr.wkbPolygon:
-        simplified_geom = processed_geom.SimplifyPreserveTopology(validation.SIMPLIFY_TOLERANCE)
-        if not simplified_geom or simplified_geom.IsEmpty():
-            return False, processed_geom, "Simplification produced empty geometry", "; ".join(actions)
-        simplified_geom = trunc_decimal(simplified_geom, const.DECIMAL)
-
-        if not simplified_geom.IsValid():
-            return False, simplified_geom, "geometry invalid after simplification", "; ".join(actions)
-
-        processed_geom = simplified_geom
-        actions.append("Simplified")
     actions_taken = "; ".join(actions) if actions else None
     return True, processed_geom, "Valid", actions_taken
 

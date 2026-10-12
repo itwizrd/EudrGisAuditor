@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (selectedFiles.length > 0) {
             fileListArea.classList.remove('hidden');
             fileListContainer.innerHTML = '';
-            
+
             const filesToShow = selectedFiles.slice(0, 10);
             filesToShow.forEach(file => {
                 const fileItem = document.createElement('div');
@@ -81,16 +81,15 @@ document.addEventListener('DOMContentLoaded', function () {
     processBtn.addEventListener('click', () => {
         uploadFieldset.disabled = true;
         progressSection.classList.remove('hidden');
-        
+
         const formData = new FormData();
         selectedFiles.forEach(file => {
             formData.append('files', file, file.webkitRelativePath || file.name);
         });
-        
-        formData.append('simplify', document.getElementById('simplify').checked);
+
         formData.append('autofix', document.getElementById('autofix').checked);
         formData.append('identify_candidates', document.getElementById('identify_candidates').checked);
-        
+
         fetch('/process', { method: 'POST', body: formData })
             .then(response => response.json())
             .then(data => {
@@ -104,14 +103,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function pollStatus(sessionId) {
         let lastProgress = 0;
-        
+
         const smoothProgressBar = (targetProgress) => {
             const currentProgress = parseInt(progressBar.style.width) || 0;
             if (targetProgress < currentProgress) return;
-            
+
             const step = (targetProgress - currentProgress) / 10;
             let current = currentProgress;
-            
+
             const animate = () => {
                 if (current < targetProgress) {
                     current = Math.min(current + step, targetProgress);
@@ -119,12 +118,12 @@ document.addEventListener('DOMContentLoaded', function () {
                     requestAnimationFrame(animate);
                 }
             };
-            
+
             if (step > 0) {
                 animate();
             }
         };
-        
+
         const interval = setInterval(() => {
             fetch(`/status/${sessionId}`)
                 .then(response => response.json())
@@ -135,10 +134,10 @@ document.addEventListener('DOMContentLoaded', function () {
                         smoothProgressBar(currentProgress);
                         lastProgress = currentProgress;
                     }
-                    
+
                     statusMessage.textContent = status.message || '...';
                     progressStep.textContent = status.step || 'Processing...';
-                    
+
                     if (status.progress >= 100) {
                         clearInterval(interval);
                         if (status.error) {
@@ -167,9 +166,9 @@ document.addEventListener('DOMContentLoaded', function () {
         progressBar.style.width = '100%';
         progressBar.classList.add('error');
         progressBar.classList.remove('complete');
-        
+
         resultsLink.textContent = "Retry";
-        resultsLink.href = "/"; 
+        resultsLink.href = "/";
         resultsLink.classList.remove('disabled', 'primary');
 
         uploadFieldset.disabled = false;

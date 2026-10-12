@@ -9,13 +9,11 @@ class EudrGisQaAssistant:
     EXPECTED_EPSG = "4326"
 
     def __init__(self, input_dir: str, base_output_dir: str,
-                 simplify_geometries: bool = True,
                  autofix_geometries: bool = True,
                  identify_candidates: bool = True):
         self.run_date = Path(base_output_dir).name
         self.input_dir = Path(input_dir)
         self.output_dir = Path(base_output_dir)
-        self.simplify_geometries = simplify_geometries
         self.autofix_geometries = autofix_geometries
         self.identify_candidates = identify_candidates
 
@@ -91,7 +89,7 @@ class EudrGisQaAssistant:
 
             partition_stats, detailed_rows = transformations.partition_and_process_dataset(
                 ds, dataset_path.stem, self.processed_valid_dir, self.processed_review_dir,
-                self.conversion_candidates_dir, self.simplify_geometries, self.autofix_geometries,
+                self.conversion_candidates_dir, self.autofix_geometries,
                 self.identify_candidates
             )
             all_detailed_rows.extend(detailed_rows)

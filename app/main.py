@@ -82,7 +82,6 @@ def process_files():
 
         thread = Thread(target=run_gis_task, args=(
             session_id, str(session_input_dir), str(session_output_dir),
-            request.form.get('simplify') == 'true',
             request.form.get('autofix') == 'true',
             request.form.get('identify_candidates') == 'true'
         ))
@@ -256,7 +255,7 @@ def cleanup_session_data(session_id: str):
         logger.exception(f"Error cleaning up session {session_id}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-def run_gis_task(session_id, input_dir, output_dir, simplify, autofix, identify_candidates):
+def run_gis_task(session_id, input_dir, output_dir, autofix, identify_candidates):
     """Runs the GIS processing task in a separate thread."""
     def update_progress(status):
         tasks[session_id].update(status)
@@ -268,7 +267,7 @@ def run_gis_task(session_id, input_dir, output_dir, simplify, autofix, identify_
         dated_output_dir = Path(output_dir) / dated_name
         dated_output_dir.mkdir(parents=True, exist_ok=True)
 
-        assistant = EudrGisQaAssistant(input_dir, str(dated_output_dir), simplify, autofix, identify_candidates)
+        assistant = EudrGisQaAssistant(input_dir, str(dated_output_dir), autofix, identify_candidates)
         assistant.run(update_progress=update_progress)
 
         update_progress({
