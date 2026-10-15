@@ -51,11 +51,26 @@ def get_area_in_hectares(geom: ogr.Geometry) -> float | None:
         logger.error(f"Failed to transform geometry: {geom}")
         return None
 
-def partition_and_process_dataset(ds: ogr.DataSource, dataset_stem: str, valid_dir: Path,
-                                review_dir: Path, candidates_dir: Path, autofix: bool,
-                                identify_candidates: bool) -> tuple[dict[str, int], list[dict[str, str | None]]]:
+def partition_and_process_dataset(
+    ds: ogr.DataSource,
+    dataset_stem: str,
+    valid_dir: Path,
+    review_dir: Path,
+    candidates_dir: Path,
+    autofix: bool,
+    identify_candidates: bool
+) -> tuple[
+    dict[str, int],
+    list[dict[str,str | None]]
+]:
     """Partitions dataset features into valid, review, and candidate categories."""
-    stats = {'total': 0, 'valid_large': 0, 'review': 0, 'autofixed': 0, 'candidates': 0}
+    stats = {
+        'total': 0,
+        'valid_large': 0,
+        'review': 0,
+        'autofixed': 0,
+        'candidates': 0
+    }
     detailed_rows = []
 
     in_layer = ds.GetLayer()
@@ -166,14 +181,22 @@ def partition_and_process_dataset(ds: ogr.DataSource, dataset_stem: str, valid_d
 def validate_and_fix_geometry(
     geom: ogr.Geometry,
     autofix: bool,
-) -> tuple[bool, ogr.Geometry | None, str, str | None]:
+) -> tuple[
+    bool,
+    ogr.Geometry | None,
+    str,
+    str | None
+]:
     """Validates and optionally fixes geometry issues."""
     if not geom or geom.IsEmpty():
         return False, None, "Missing or empty geometry", None
 
     geom_type = geom.GetGeometryType() & 0x000000ff
 
-    if geom_type in [ogr.wkbLineString, ogr.wkbMultiLineString]:
+    if geom_type in (
+        ogr.wkbLineString,
+        ogr.wkbMultiLineString
+    ):
         return False, geom, "Invalid geometry type (LineString)", None
 
     processed_geom = geom.Clone()
