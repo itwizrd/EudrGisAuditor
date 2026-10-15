@@ -60,14 +60,14 @@ def validate_geometry_vertices(geom: ogr.Geometry) -> tuple[bool, str]:
     Returns:
         A tuple of (is_valid, error_message).
     """
-    precision = 10 ** DECIMAL
+    p = 10 ** DECIMAL
     if not geom or geom.IsEmpty():
         return True, ""
     for lon, lat in get_all_points(geom):
         if not (-180.0 <= lon <= 180.0 and -90.0 <= lat <= 90.0):
             return False, f"Invalid coordinate range: [{lon}, {lat}]"
         # Check for excessive decimal places (const.DECIMAL) rounded DOWN
-        if lon != (trunc(lon * precision) / precision) or lat != (trunc(lat * precision) / precision):
+        if lon != (trunc(lon * p) / p) or lat != (trunc(lat * p) / p):
             return False, f"Excessive decimal places: [{lon}, {lat}]"
     return True, ""
 
