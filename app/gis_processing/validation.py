@@ -62,7 +62,7 @@ def validate_geometry_vertices(geom: ogr.Geometry) -> tuple[bool, str]:
     """
     p = 10 ** DECIMAL
     if not geom or geom.IsEmpty():
-        return True, ""
+        return False, "Geom is empty"
     for lon, lat in get_all_points(geom):
         if not (-180.0 <= lon <= 180.0 and -90.0 <= lat <= 90.0):
             return False, f"Invalid coordinate range: [{lon}, {lat}]"
