@@ -11,15 +11,27 @@ from . import const, validation
 
 logger = logging.getLogger(__name__)
 
-def trunc_decimal(geom: ogr.Geometry, precision: int = const.DECIMAL) -> ogr.Geometry:
+def trunc_decimal(
+    geom: ogr.Geometry,
+    precision: int = const.DECIMAL,
+) -> tuple[ogr.Geometry, bool]:
     """Rounds the geometry vertices to the specified precision."""
     p = 10 ** precision
+    truncd = False
+
     for i in range(geom.GetPointCount()):
         x, y = geom.GetPoint_2D(i)
-        geom.SetPoint_2D(i, (trunc(x * p) / p), (trunc(y * p) / p))
+        xT = trunc(x * p) / p
+        yT = trunc(y * p) / p
+        if xT != x or yT != y:
+            truncd = True
+            geom.SetPoint_2D(i, xT, yT)
     for i in range(geom.GetGeometryCount()):
-        trunc_decimal(geom.GetGeometryRef(i), precision)
-    return geom
+        c = geom.GetGeometryRef(i)
+        if c is not None:
+            _, cT = trunc_decimal(c, precision)
+            truncd = truncd or cT
+    return geom, truncd
 
 def get_area_in_hectares(geom: ogr.Geometry) -> float | None:
     """Calculates geometry area in hectares using appropriate projection."""
@@ -110,7 +122,8 @@ def partition_and_process_dataset(
             stats['review'] += 1
             review_feature = ogr.Feature(review_layer.GetLayerDefn())
             review_feature.SetFrom(in_feature)
-            review_feature.SetGeometry(geom)
+            if geom is not None:
+                review_feature.SetGeometry(geom)
             review_feature.SetField("qa_issue", reason)
             review_layer.CreateFeature(review_feature)
 
@@ -130,6 +143,7 @@ def partition_and_process_dataset(
             reason = "Could not calculate area"
             review_feature = ogr.Feature(review_layer.GetLayerDefn())
             review_feature.SetFrom(in_feature)
+            review_feature.SetGeometry(geom)
             review_feature.SetField("qa_issue", reason)
             review_layer.CreateFeature(review_feature)
 
@@ -189,40 +203,110 @@ def validate_and_fix_geometry(
 ]:
     """Validates and optionally fixes geometry issues."""
     if not geom or geom.IsEmpty():
-        return False, None, "Missing or empty geometry", None
-
-    geom_type = geom.GetGeometryType() & 0x000000ff
-
+        return (
+            False,
+            geom,
+            "Missing or empty geometry",
+            None
+        )
+    processed_geom = geom.Clone()
+    geom_type = processed_geom.GetGeometryType() & 0x000000ff
     if geom_type in (
         ogr.wkbLineString,
         ogr.wkbMultiLineString
     ):
-        return False, geom, "Invalid geometry type (LineString)", None
+        return (
+            False,
+            processed_geom,
+            f"Invalid geometry type ({processed_geom.GetGeometryName()})",
+            None
+        )
 
-    processed_geom = geom.Clone()
-    valid_verts, reason = validation.validate_geometry_vertices(processed_geom)
-    if not valid_verts:
-        return False, processed_geom, reason, None
+    actions: list[str] = []
 
-    actions = []
+    range_valid, reason = validation.validate_range(processed_geom)
+    if not range_valid:
+        return (
+            False,
+            processed_geom,
+            reason,
+            None
+        )
 
-    processed_geom = trunc_decimal(processed_geom, const.DECIMAL)
-    actions.append("Coordinates truncated to 6 decimal places")
+    if autofix:
+        processed_geom, coords_changed = trunc_decimal(processed_geom, const.DECIMAL)
+        if coords_changed:
+            actions.append(f"Coordinates truncated to {const.DECIMAL} decimal places")
+    else:
+        precision_valid, reason = validation.validate_precision(processed_geom)
+        if not precision_valid:
+            return (
+                False,
+                processed_geom,
+                reason,
+                None
+            )
 
     if not processed_geom.IsValid():
         if not autofix:
-            return False, processed_geom, "Invalid geometry after truncation", None
+            return (
+            False,
+            processed_geom,
+            "Invalid geometry",
+            None
+            )
+
         fixed_geom = processed_geom.Buffer(0)
-        if not fixed_geom or fixed_geom.IsEmpty() and not fixed_geom.IsValid():
-            return False, processed_geom, "Invalid geometry after trunc; Buffer(0) failed", None
+        if (
+            not fixed_geom
+            or fixed_geom.IsEmpty()
+            or not fixed_geom.IsValid()
+        ):
+            return (
+                False,
+                processed_geom,
+                "Invalid geometry; Buffer(0) failed",
+                "; ".join(actions) or None,
+            )
+        fixed_geom_type = fixed_geom.GetGeometryType() & 0x000000ff
+        if fixed_geom_type != geom_type:
+            actions.append("Buffer(0) produced a different geometry type")
+            return (
+                False,
+                processed_geom,
+                (
+                    "Buffer(0) changed geometry type "
+                    f"from {processed_geom.GetGeometryName()} "
+                    f"to {fixed_geom.GetGeometryName()}"
+                ),
+                "; ".join(actions) or None,
+            )
+        fixed_range_valid, fixed_reason = validation.validate_range(fixed_geom)
+        if not fixed_range_valid:
+            return (
+                False,
+                processed_geom,
+                f"Buffer(0) produced invalid coordinates: {fixed_reason}",
+                "; ".join(actions) or None,
+            )
         processed_geom = fixed_geom
-        actions.append("Repaired with buffer(0)")
+        geom_type = fixed_geom_type
+        actions.append("Repaired with Buffer(0)")
 
-    if geom_type == ogr.wkbPolygon and geom.GetGeometryCount() > 1:
-        return False, processed_geom, "Polygon with holes not supported", "; ".join(actions)
+    if geom_type == ogr.wkbPolygon and processed_geom.GetGeometryCount() > 1:
+        return (
+        False,
+        processed_geom,
+        "Polygon with holes not supported",
+        "; ".join(actions) or None
+        )
 
-    actions_taken = "; ".join(actions) if actions else None
-    return True, processed_geom, "Valid", actions_taken
+    return (
+    True,
+    processed_geom,
+    "Valid",
+    "; ".join(actions) or None
+    )
 
 def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_convert: list[str]) -> tuple[int, list[str]]:
     """Converts candidate polygons to points in a batch operation."""
@@ -282,7 +366,7 @@ def batch_convert_candidates_to_points(session_output_dir: Path, qa_ids_to_conve
                         if not centroid:
                             failed_ids.append(qa_id)
                             continue
-                        centroid = trunc_decimal(centroid, const.DECIMAL)
+                        centroid, _ = trunc_decimal(centroid, const.DECIMAL)
 
                         feature['geometry'] = json.loads(centroid.ExportToJson())
                         if 'Area' in feature['properties']:

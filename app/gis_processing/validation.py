@@ -51,22 +51,21 @@ def get_all_points(geom: ogr.Geometry) -> list[tuple[float, float]]:
             if sub_geom: points.extend(get_all_points(sub_geom))
     return points
 
-def validate_geometry_vertices(geom: ogr.Geometry) -> tuple[bool, str]:
-    """
-    Validates that all geometry vertices are within valid geographic bounds.
-    Checks for excessive decimal places.
-    Args:
-        geom: The geometry object to validate.
-    Returns:
-        A tuple of (is_valid, error_message).
-    """
+def validate_range(geom: ogr.Geometry) -> tuple[bool, str]:
+    if not geom or geom.IsEmpty():
+        return False, "Geometry is empty"
+    for lon, lat in get_all_points(geom):
+        if lon < -180.0 or lon > 180.0:
+            return False, f"Invalid longitude: [{lon}, {lat}]"
+        if lat < -90.0 or lat > 90.0:
+            return False, f"Invalid latitude: [{lon}, {lat}]"
+    return True, ""
+
+def validate_precision(geom: ogr.Geometry) -> tuple[bool, str]:
     p = 10 ** DECIMAL
     if not geom or geom.IsEmpty():
         return False, "Geom is empty"
     for lon, lat in get_all_points(geom):
-        if not (-180.0 <= lon <= 180.0 and -90.0 <= lat <= 90.0):
-            return False, f"Invalid coordinate range: [{lon}, {lat}]"
-        # Check for excessive decimal places (const.DECIMAL) rounded DOWN
         if lon != (trunc(lon * p) / p) or lat != (trunc(lat * p) / p):
             return False, f"Excessive decimal places: [{lon}, {lat}]"
     return True, ""
