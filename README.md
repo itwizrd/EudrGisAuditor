@@ -65,3 +65,8 @@ The simplest way to run this application is with **Docker** and **Docker Compose
 * 🗄️ **Database Integration** → Store and manage audit results for long-term tracking.
 * 🐳 **Production-Ready Docker** → Stabilize the container for reliable deployment in production environments (currently experimental).
 ---
+
+
+ ```bash
+ podman compose -f .\docker-compose.yml up
+ ```
