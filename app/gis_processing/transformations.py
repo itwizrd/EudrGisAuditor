@@ -237,6 +237,13 @@ def validate_and_fix_geometry(
         processed_geom, coords_changed = trunc_decimal(processed_geom, const.DECIMAL)
         if coords_changed:
             actions.append(f"Coordinates truncated to {const.DECIMAL} decimal places")
+            if not processed_geom.IsValid():
+                return (
+                    False,
+                    processed_geom,
+                    "Geometry bacame invalid after truncation",
+                    "; ".join(actions) or None,
+                )
     else:
         precision_valid, reason = validation.validate_precision(processed_geom)
         if not precision_valid:
@@ -257,17 +264,31 @@ def validate_and_fix_geometry(
             )
 
         fixed_geom = processed_geom.Buffer(0)
-        if (
-            not fixed_geom
-            or fixed_geom.IsEmpty()
-            or not fixed_geom.IsValid()
-        ):
+        if not fixed_geom:
             return (
                 False,
                 processed_geom,
-                "Invalid geometry; Buffer(0) failed",
+                "Buffer(0) returned no geometry",
                 "; ".join(actions) or None,
             )
+        if fixed_geom.IsEmpty():
+            return (
+                False,
+                processed_geom,
+                "Buffer(0) returned an empty geometry",
+                "; ".join(actions) or None,
+            )
+        if not fixed_geom.IsValid():
+            return (
+                False,
+                processed_geom,
+                (
+                    "Buffer(0) returned invalid geometry "
+                    f"({fixed_geom.GetGeometryName()})"
+                ),
+                "; ".join(actions) or None,
+            )
+
         fixed_geom_type = fixed_geom.GetGeometryType() & 0x000000ff
         if fixed_geom_type != geom_type:
             actions.append("Buffer(0) produced a different geometry type")
