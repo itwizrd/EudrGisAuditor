@@ -15,7 +15,7 @@ def trunc_decimal(
     geom: ogr.Geometry,
     precision: int = const.DECIMAL,
 ) -> tuple[ogr.Geometry, bool]:
-    """Rounds the geometry vertices to the specified precision."""
+    """Truncates the geometry vertices to the specified precision."""
     p = 10 ** precision
     truncd = False
 
@@ -232,12 +232,15 @@ def validate_and_fix_geometry(
             reason,
             None
         )
+    validity_before_truncation = processed_geom.IsValid()
 
     if autofix:
         processed_geom, coords_changed = trunc_decimal(processed_geom, const.DECIMAL)
         if coords_changed:
             actions.append(f"Coordinates truncated to {const.DECIMAL} decimal places")
-            if not processed_geom.IsValid():
+            validity_after_truncation = processed_geom.IsValid()
+
+            if validity_before_truncation and not validity_after_truncation:
                 return (
                     False,
                     processed_geom,
